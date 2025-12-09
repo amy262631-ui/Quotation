@@ -1247,6 +1247,57 @@ function MainItemBlock({ item, quote, updateQuote }) {
   );
 }
 /****************************************************
+ * P4-3（前置）— 規格品下拉清單（Google Sheet）
+ ****************************************************/
+function SpecSelector({ onSelect }) {
+  const { specItems } = React.useContext(AppContext);
+
+  const [keyword, setKeyword] = React.useState("");
+
+  // 搜尋結果
+  const filtered = specItems.filter(it =>
+    (it.name || "").includes(keyword) ||
+    (it.spec || "").includes(keyword)
+  );
+
+  return (
+    <div className="p-4 bg-white rounded shadow mb-4">
+
+      <div className="font-bold mb-2">🔍 規格品快速加入（來自 Google Sheet）</div>
+
+      {/* 搜尋框 */}
+      <input
+        className="border rounded px-3 py-2 w-full mb-3"
+        placeholder="輸入名稱或規格搜尋…"
+        value={keyword}
+        onChange={(e) => setKeyword(e.target.value)}
+      />
+
+      {/* 搜尋結果列表 */}
+      <div className="max-h-60 overflow-y-auto border rounded">
+        {filtered.length === 0 && (
+          <div className="text-gray-400 text-center py-3">
+            無符合資料
+          </div>
+        )}
+
+        {filtered.map((item, index) => (
+          <button
+            key={index}
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 border-b"
+            onClick={() => onSelect(item)}
+          >
+            <div className="font-bold">{item.name}</div>
+            <div className="text-sm text-gray-600">
+              {item.spec}｜{item.unit}｜${item.price}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+  /****************************************************
  * P4-3（G）— ItemsEditor（品項主編輯器）
  ****************************************************/
 function ItemsEditor({ quote, updateQuote }) {
