@@ -840,6 +840,31 @@ function ItemBlock({ item, updateItem, deleteItem }) {
   );
 }
 /****************************************************
+ * UploadImageButton — 上傳圖片按鈕（缺少會爆錯）
+ ****************************************************/
+function UploadImageButton({ onUpload }) {
+  function handleSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => onUpload(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <label className="inline-block px-3 py-1 bg-gray-200 rounded cursor-pointer text-sm">
+      📷 上傳圖片
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleSelect}
+      />
+    </label>
+  );
+}
+/****************************************************
  * P4-3（C）子項目 SubItemBlock
  ****************************************************/
 
