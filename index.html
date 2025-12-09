@@ -870,51 +870,6 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
   return <ItemSubItemBlock {...props} />;
 }
 
-  /****************************************************
- * P4-3（E）SubItemWrapper — 自動判斷小項類型
- ****************************************************/
-function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
-
-  // 更新某個 subItem 欄位
-  function updateSubField(field, value) {
-    const newSubItems = parentItem.subItems.map(s =>
-      s.id === subItem.id ? { ...s, [field]: value } : s
-    );
-
-    const newItems = quote.items.map(it =>
-      it.id === parentItem.id ? { ...it, subItems: newSubItems } : it
-    );
-
-    updateQuote(quote.id, { items: newItems });
-  }
-
-  // 刪除 subItem
-  function deleteSub() {
-    const newSubItems = parentItem.subItems.filter(s => s.id !== subItem.id);
-    const newItems = quote.items.map(it =>
-      it.id === parentItem.id ? { ...it, subItems: newSubItems } : it
-    );
-    updateQuote(quote.id, { items: newItems });
-  }
-
-  // 轉型格式後丟到各子元件
-  const props = {
-    sub: subItem,
-    parent: parentItem,
-    updateField: updateSubField,
-    deleteSubItem: deleteSub
-  };
-
-  if (subItem.type === "note") {
-    return <NoteSubItemBlock {...props} />;
-  }
-
-  if (subItem.type === "image") {
-    return <ImageSubItemBlock {...props} />;
-  }
-
-  return <ItemSubItemBlock {...props} />;
-}
 /****************************************************
  *P4-3（E）UploadImageButton（獨立上傳圖片按鈕）
  ****************************************************/
