@@ -1127,6 +1127,35 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
   return <ItemSubItemBlock {...props} />;
 }
 /****************************************************
+ * P4-3（E）— UploadImageButton（補充圖片上傳按鈕）
+ ****************************************************/
+function UploadImageButton({ onUpload }) {
+
+  function handleSelectFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result;
+      onUpload(base64);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <label className="cursor-pointer text-blue-600">
+      ＋補充圖片
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleSelectFile}
+      />
+    </label>
+  );
+}
+/****************************************************
  * P4-3（F）— MainItemBlock（大項編輯區）
  ****************************************************/
 function MainItemBlock({ item, quote, updateQuote }) {
