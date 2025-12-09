@@ -25,10 +25,30 @@
       font-family: "Microsoft JhengHei", sans-serif;
     }
 
-    @media print {
-      .no-print { display: none !important; }
-      body { background: white !important; }
+  @media print {
+    .no-print { display: none !important; }
+
+    .print-container {
+      display: block !important;
+      padding: 10mm;
+      font-size: 14px;
     }
+
+    table { border-collapse: collapse; width: 100%; }
+    table th, table td { border: 1px solid black; padding: 3px 4px; }
+
+    thead { display: table-header-group !important; }
+    tfoot { display: table-footer-group !important; }
+
+    tr { page-break-inside: avoid !important; }
+
+    #print-page-number {
+      position: fixed;
+      bottom: 10mm;
+      right: 10mm;
+      font-size: 12px;
+    }
+  }
   </style>
 </head>
 
@@ -1460,33 +1480,6 @@ function openPrint() {
   }, 150);
 }
 
-/****************************************************
- * P5-9 + P5-10 — 列印 CSS（表頭重複 + 頁碼）
- ****************************************************/
-@media print {
-  .no-print { display: none !important; }
-
-  .print-container {
-    display: block !important;
-    padding: 10mm;
-    font-size: 14px;
-  }
-
-  table { border-collapse: collapse; width: 100%; }
-  table th, table td { border: 1px solid black; padding: 3px 4px; }
-
-  thead { display: table-header-group !important; }
-  tfoot { display: table-footer-group !important; }
-
-  tr { page-break-inside: avoid !important; }
-
-  #print-page-number {
-    position: fixed;
-    bottom: 10mm;
-    right: 10mm;
-    font-size: 12px;
-  }
-}
 
 /****************************************************
  * P5 — App 主組裝（左側管理 / 右側編輯）
