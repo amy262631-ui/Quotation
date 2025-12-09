@@ -674,104 +674,105 @@ function QuoteEditor() {
     </div>
   );
 }
+
 /****************************************************
- *P4-3（A）NoteSubItemBlock（補充文字）
+ * P4-3（A）NoteSubItemBlock — 文字補充小項
  ****************************************************/
 function NoteSubItemBlock({ sub, parent, updateField, deleteSubItem }) {
   return (
     <div className="border rounded p-3 bg-gray-50">
 
-      {/* 標題列 */}
-      <div className="flex justify-between mb-2">
-        <span className="text-sm font-bold text-gray-700">📝 補充內容</span>
-
-        <button
-          className="text-red-600 text-sm"
-          onClick={() => deleteSubItem(sub.id)}
-        >
+      {/* 標題 + 刪除 */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold">📄 補充文字</span>
+        <button className="text-red-600 text-sm" onClick={deleteSubItem}>
           刪除
         </button>
       </div>
 
-      {/* 文字內容 */}
       <textarea
-        className="w-full border rounded px-2 py-1 text-sm"
-        rows={3}
+        className="w-full border rounded p-2 text-sm"
+        rows="2"
         value={sub.text || ""}
         onChange={(e) => updateField("text", e.target.value)}
-        placeholder="輸入補充說明內容…"
+        placeholder="輸入補充說明…"
       />
     </div>
   );
 }
+
+
 /****************************************************
- * P4-3（B）ItemSubItemBlock（可計算金額的小項）
+ * P4-3（B）ItemSubItemBlock — 子項目（含數量/單價）
  ****************************************************/
 function ItemSubItemBlock({ sub, parent, updateField, deleteSubItem }) {
   return (
     <div className="border rounded p-3 bg-gray-50">
 
-      {/* 標題列 */}
-      <div className="flex justify-between mb-2">
-        <span className="text-sm font-bold text-gray-700">📌 子項目</span>
-        <button
-          className="text-red-600 text-sm"
-          onClick={() => deleteSubItem(sub.id)}
-        >
+      {/* 標題 + 刪除 */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold">📦 子項目</span>
+        <button className="text-red-600 text-sm" onClick={deleteSubItem}>
           刪除
         </button>
       </div>
 
-      {/* 欄位表單 */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-12 gap-2">
 
+        {/* 名稱 */}
         <input
-          className="border p-1 rounded col-span-2"
+          className="border p-1 rounded col-span-3"
+          value={sub.name || ""}
           placeholder="名稱"
-          value={sub.name}
           onChange={(e) => updateField("name", e.target.value)}
         />
 
+        {/* 規格 */}
         <input
-          className="border p-1 rounded col-span-2"
+          className="border p-1 rounded col-span-4"
+          value={sub.spec || ""}
           placeholder="規格"
-          value={sub.spec}
           onChange={(e) => updateField("spec", e.target.value)}
         />
 
+        {/* 單位 */}
         <input
           className="border p-1 rounded col-span-1"
+          value={sub.unit || ""}
           placeholder="單位"
-          value={sub.unit}
           onChange={(e) => updateField("unit", e.target.value)}
         />
 
+        {/* 數量 */}
         <input
-          type="number"
           className="border p-1 rounded col-span-1"
+          value={sub.qty || ""}
           placeholder="數量"
-          value={sub.qty}
+          type="number"
           onChange={(e) => updateField("qty", e.target.value)}
         />
 
+        {/* 單價 */}
         <input
-          type="number"
           className="border p-1 rounded col-span-2"
+          value={sub.price || ""}
           placeholder="單價"
-          value={sub.price}
+          type="number"
           onChange={(e) => updateField("price", e.target.value)}
         />
 
-        <div className="col-span-6 text-right text-sm font-bold">
-          小計：{formatMoney(calcAmount(sub))} 元
+        {/* 小計 */}
+        <div className="col-span-1 text-right font-bold">
+          {formatMoney(calcAmount(sub))}
         </div>
-
       </div>
     </div>
   );
 }
+
+
 /****************************************************
- * P4-3（C）ImageSubItemBlock（補充圖片）
+ * P4-3（C）ImageSubItemBlock — 圖片小項
  ****************************************************/
 function ImageSubItemBlock({ sub, parent, updateField, deleteSubItem }) {
 
@@ -787,91 +788,30 @@ function ImageSubItemBlock({ sub, parent, updateField, deleteSubItem }) {
   return (
     <div className="border rounded p-3 bg-gray-50">
 
-      {/* 標題列 */}
-      <div className="flex justify-between mb-2">
-        <span className="text-sm font-bold text-gray-700">📷 補充圖片</span>
-
-        <button
-          className="text-red-600 text-sm"
-          onClick={() => deleteSubItem(sub.id)}
-        >
-          刪除
-        </button>
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold">📷 圖片</span>
+        <button className="text-red-600 text-sm" onClick={deleteSubItem}>刪除</button>
       </div>
 
-      {/* 圖片預覽 */}
+      {/*圖片預覽*/}
       {sub.src ? (
-        <div className="flex flex-col gap-2">
-          <img src={sub.src} className="max-w-xs rounded shadow border" />
-
-          <button
-            className="text-blue-600 text-xs underline"
-            onClick={() => updateField("src", "")}
-          >
-            重新上傳
-          </button>
-        </div>
+        <img src={sub.src} className="max-w-xs mb-2 border rounded shadow" />
       ) : (
-        <div className="text-gray-500 text-sm mb-2">
-          尚未上傳圖片
-        </div>
+        <div className="text-gray-500 text-sm mb-2">尚未上傳圖片</div>
       )}
 
       {/* 上傳按鈕 */}
-      <label className="cursor-pointer text-blue-700 text-sm underline mt-2 inline-block">
+      <label className="cursor-pointer text-blue-700 underline text-sm">
         上傳圖片
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleUpload}
-        />
+        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       </label>
-
     </div>
   );
 }
-/****************************************************
- * P4-3（D）SubItemWrapper（自動切換小項元件）
- ****************************************************/
-function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 
-  function updateField(field, value) {
-    const newSubItems = parentItem.subItems.map(s =>
-      s.id === subItem.id ? { ...s, [field]: value } : s
-    );
-
-    const newItems = quote.items.map(m =>
-      m.id === parentItem.id ? { ...m, subItems: newSubItems } : m
-    );
-
-    updateQuote(quote.id, { items: newItems });
-  }
-
-  function deleteSubItem(id) {
-    const newSubItems = parentItem.subItems.filter(s => s.id !== id);
-    const newItems = quote.items.map(m =>
-      m.id === parentItem.id ? { ...m, subItems: newSubItems } : m
-    );
-
-    updateQuote(quote.id, { items: newItems });
-  }
-
-  const props = {
-    sub: subItem,
-    parent: parentItem,
-    updateField,
-    deleteSubItem
-  };
-
-  if (subItem.type === "note") return <NoteSubItemBlock {...props} />;
-  if (subItem.type === "image") return <ImageSubItemBlock {...props} />;
-
-  return <ItemSubItemBlock {...props} />;
-}
 
 /****************************************************
- *P4-3（E）UploadImageButton（獨立上傳圖片按鈕）
+ * P4-3（D）UploadImageButton — 在底部新增圖片用
  ****************************************************/
 function UploadImageButton({ onUpload }) {
 
@@ -887,17 +827,54 @@ function UploadImageButton({ onUpload }) {
   return (
     <label className="cursor-pointer text-blue-600">
       ＋補充圖片
-      <input
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleSelect}
-      />
+      <input type="file" accept="image/*" className="hidden" onChange={handleSelect} />
     </label>
   );
 }
+
+
 /****************************************************
- * P4-3（F）MainItemBlock（大項編輯主元件）
+ * P4-3（E）SubItemWrapper — 自動分流小項類型
+ ****************************************************/
+function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
+
+  // 更新某個 subItem
+  function updateField(field, value) {
+    const newItems = quote.items.map(m =>
+      m.id === parentItem.id
+        ? {
+            ...m,
+            subItems: m.subItems.map(s =>
+              s.id === subItem.id ? { ...s, [field]: value } : s
+            )
+          }
+        : m
+    );
+    updateQuote(quote.id, { items: newItems });
+  }
+
+  // 刪除 subItem
+  function deleteSubItem() {
+    const newItems = quote.items.map(m =>
+      m.id === parentItem.id
+        ? { ...m, subItems: m.subItems.filter(s => s.id !== subItem.id) }
+        : m
+    );
+    updateQuote(quote.id, { items: newItems });
+  }
+
+  const props = { sub: subItem, parent: parentItem, updateField, deleteSubItem };
+
+  if (subItem.type === "note") return <NoteSubItemBlock {...props} />;
+  if (subItem.type === "item") return <ItemSubItemBlock {...props} />;
+  if (subItem.type === "image") return <ImageSubItemBlock {...props} />;
+
+  return null;
+}
+
+
+/****************************************************
+ * P4-3（F）MainItemBlock — 大項編輯
  ****************************************************/
 function MainItemBlock({ item, quote, updateQuote }) {
 
@@ -913,7 +890,8 @@ function MainItemBlock({ item, quote, updateQuote }) {
     updateQuote(quote.id, { items: quote.items.filter(m => m.id !== item.id) });
   }
 
-  function addSubItem(type) {
+  // 新增小項（含圖片）
+  function addSub(type, src = "") {
     const newSub = {
       id: uuid(),
       type,
@@ -923,7 +901,7 @@ function MainItemBlock({ item, quote, updateQuote }) {
       unit: "",
       qty: "",
       price: "",
-      src: ""
+      src
     };
 
     const newItems = quote.items.map(m =>
@@ -939,55 +917,36 @@ function MainItemBlock({ item, quote, updateQuote }) {
       {/* 大項資料列 */}
       <div className="grid grid-cols-12 gap-2">
 
-        <input
-          className="border p-1 rounded col-span-3"
-          value={item.name}
-          placeholder="品名"
-          onChange={(e) => update({ name: e.target.value })}
-        />
+        <input className="border p-1 rounded col-span-3"
+          value={item.name} placeholder="品名"
+          onChange={(e) => update({ name: e.target.value })} />
 
-        <input
-          className="border p-1 rounded col-span-3"
-          value={item.spec}
-          placeholder="規格"
-          onChange={(e) => update({ spec: e.target.value })}
-        />
+        <input className="border p-1 rounded col-span-3"
+          value={item.spec} placeholder="規格"
+          onChange={(e) => update({ spec: e.target.value })} />
 
-        <input
-          className="border p-1 rounded col-span-1"
-          value={item.unit}
-          placeholder="單位"
-          onChange={(e) => update({ unit: e.target.value })}
-        />
+        <input className="border p-1 rounded col-span-1"
+          value={item.unit} placeholder="單位"
+          onChange={(e) => update({ unit: e.target.value })} />
 
-        <input
-          className="border p-1 rounded col-span-1"
-          value={item.qty}
-          placeholder="數量"
-          onChange={(e) => update({ qty: e.target.value })}
-        />
+        <input className="border p-1 rounded col-span-1"
+          value={item.qty} placeholder="數量"
+          onChange={(e) => update({ qty: e.target.value })} />
 
-        <input
-          className="border p-1 rounded col-span-2"
-          value={item.price}
-          placeholder="單價"
-          onChange={(e) => update({ price: e.target.value })}
-        />
+        <input className="border p-1 rounded col-span-2"
+          value={item.price} placeholder="單價"
+          onChange={(e) => update({ price: e.target.value })} />
 
         <div className="text-right font-bold col-span-1">
           {formatMoney(calcAmount(item))}
         </div>
 
-        <button
-          className="text-red-600 col-span-1"
-          onClick={deleteMain}
-        >
+        <button className="text-red-600 col-span-1" onClick={deleteMain}>
           刪除
         </button>
-
       </div>
 
-      {/* 小項 */}
+      {/* 小項列表 */}
       <div className="mt-3">
         {item.subItems.map(sub => (
           <SubItemWrapper
@@ -1002,20 +961,19 @@ function MainItemBlock({ item, quote, updateQuote }) {
 
       {/* 操作列 */}
       <div className="flex gap-4 mt-3 text-blue-600 text-sm">
-        <button onClick={() => addSubItem("item")}>＋子項目</button>
-        <button onClick={() => addSubItem("note")}>＋補充文字</button>
-        <UploadImageButton onUpload={(src) => addSubItem("image", src)} />
+        <button onClick={() => addSub("item")}>＋ 子項目</button>
+        <button onClick={() => addSub("note")}>＋ 補充文字</button>
+        <UploadImageButton onUpload={(src) => addSub("image", src)} />
       </div>
-
     </div>
   );
 }
 
+
 /****************************************************
- * P4-3（G）ItemsEditor（主編輯器）
+ * P4-3（G）ItemsEditor — 整體品項管理
  ****************************************************/
 function ItemsEditor({ quote, updateQuote }) {
-
   function addMain() {
     const newMain = {
       id: uuid(),
@@ -1027,7 +985,6 @@ function ItemsEditor({ quote, updateQuote }) {
       price: "",
       subItems: []
     };
-
     updateQuote(quote.id, { items: [...quote.items, newMain] });
   }
 
@@ -1049,10 +1006,10 @@ function ItemsEditor({ quote, updateQuote }) {
           updateQuote={updateQuote}
         />
       ))}
-
     </div>
   );
 }
+
 /****************************************************
  * P4-4（A）— 備註欄 NotesEditor
  ****************************************************/
