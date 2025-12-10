@@ -522,48 +522,75 @@ function ModeSelector() {
 
 
 /* --------------------------------------------------
-   報價單管理：列表、切換、刪除
+   報價單管理：列表、切換、刪除 (修正版)
    -------------------------------------------------- */
 function QuoteManager() {
   const {
     quotes,
     activeQuoteId,
     setActiveQuoteId,
-    deleteQuote
+    deleteQuote,
+    company, // 為了 P3-1 的一致性，加入 company 
+    addQuote // 為了 P3-1 的一致性，加入 addQuote
   } = React.useContext(AppContext);
 
-  return (
-    <div className="mb-8 no-print">
-      <div className="font-bold mb-2">報價單列表</div>
+  // 根據 ID 排序，讓最新的排在最上面
+  const sortedQuotes = React.useMemo(() => {
+    // 確保 quotes 是陣列且包含有效的 id
+    return [...(quotes || [])].sort((a, b) => {
+      if (!a.id || !b.id) return 0;
+      return b.id.localeCompare(a.id);
+    });
+  }, [quotes]);
 
-      {quotes.length === 0 && (
-        <div className="text-gray-400 text-sm">
+
+  return (
+    <div className="mt-4 border-t pt-4"> {/* 將 mb-8 no-print 替換為 mt-4 border-t pt-4 保持與 P3-1 修正版一致 */}
+      <h3 className="font-bold text-lg mb-2 text-gray-700">報價單列表</h3>
+
+      {/* 新增報價單按鈕 (根據標準 P3-1 加入) */}
+      <button
+        className="w-full px-3 py-2 bg-purple-600 text-white rounded mb-4 hover:bg-purple-700 transition"
+        onClick={() => addQuote(company)}
+      >
+        ＋ 建立新報價單
+      </button>
+
+      <div className="max-h-80 overflow-y-auto">
+      {sortedQuotes.length === 0 && ( // 使用 sortedQuotes
+        <div className="text-gray-500 text-sm text-center">
           尚無資料，請先建立報價單
         </div>
       )}
 
       <div className="flex flex-col gap-1">
-        {quotes.map(q => (
+        {sortedQuotes.map(q => ( // 使用 sortedQuotes
           <div
             key={q.id}
             className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer transition
               ${
                 q.id === activeQuoteId
-                  ? "bg-blue-100 border border-blue-400"
-                  : "bg-white border hover:bg-gray-50"
+                  ? "bg-blue-600 text-white shadow-md" // 保持與 P3-2 修正版一致的樣式
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-800"
               }
             `}
             onClick={() => setActiveQuoteId(q.id)}
           >
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <span className="font-semibold truncate">{q.title}</span>
-              <span className="text-xs text-gray-500">
+            {/* 文字區塊：加入 min-w-0 允許壓縮/截斷 */}
+            <div className="flex flex-col flex-1 min-w-0 mr-2"> 
+              {/* 標題：確保截斷 */}
+              <span className="font-semibold truncate text-sm">{q.title}</span>
+              {/* 資訊：較小的字體，允許換行 */}
+              <span className="text-xs opacity-80 whitespace-normal">
                 {q.date} - {q.customerName || "無客戶"}
               </span>
             </div>
 
+            {/* 按鈕區塊：加入 flex-shrink-0 確保寬度固定，不擠壓文字 */}
             <button
-              className="text-red-500 text-sm ml-2 p-1 hover:text-red-700 transition"
+              className={`text-red-600 text-xs ml-2 p-1 font-bold transition flex-shrink-0 
+              ${q.id === activeQuoteId ? "bg-red-500 hover:bg-red-600 text-white" : "hover:text-red-800"}
+              `}
               onClick={(e) => {
                 e.stopPropagation(); // 避免點到父層
                 if (confirm("確定要刪除這份報價單？")) {
@@ -576,6 +603,7 @@ function QuoteManager() {
           </div>
         ))}
       </div>
+      </div>
     </div>
   );
 }
