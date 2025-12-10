@@ -1447,86 +1447,96 @@ function exportToExcel() {
 // P7 — App 根元件
 // --------------------------------------------------
 function App() {
-  const { activeQuote, updateQuote } = React.useContext(AppContext);
+  const { activeQuote, updateQuote } = React.useContext(AppContext); // <-- Hook 1
 
-  // 當前報價單不存在時的畫面
-  if (!activeQuote) {
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold mb-4">工程報價系統</h1>
-        <div className="grid grid-cols-4 gap-6">
-          <div className="col-span-1">
-            <CompanySelector />
-            <ModeSelector />
-            <QuoteManager />
-          </div>
-          <div className="col-span-3 p-8 bg-white rounded shadow text-center text-gray-500">
-            請在左側選單建立或選擇一份報價單開始編輯。
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 1. 將所有 Hooks 放在頂層 (在條件判斷之前)
 
-  // 更新 activeQuote 的函數
-  const updateActiveQuote = React.useCallback((data) => {
-    updateQuote(activeQuote.id, data);
-  }, [activeQuote.id, updateQuote]);
-  
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4 no-print">工程報價系統 - 編輯中：{activeQuote.title}</h1>
+  // 更新 activeQuote 的函數 (Hook 2)
+  // 注意：因為 activeQuote 在 Hook 內部被使用，所以我們必須在這裡處理它可能為 null 的情況。
+  const updateActiveQuote = React.useCallback((data) => {
+    // 只有在 activeQuote 存在時才執行更新
+    if (activeQuote && activeQuote.id) {
+      updateQuote(activeQuote.id, data);
+    }
+  }, [activeQuote, updateQuote]); // 將依賴項從 activeQuote.id 改為 activeQuote
 
-      <div className="grid grid-cols-4 gap-6">
-        {/* 左側選單 */}
-        <div className="col-span-1">
-          <div className="p-4 bg-white rounded shadow">
-            <CompanySelector />
-            <ModeSelector />
-            <QuoteManager />
-          </div>
-        </div>
+  // 2. 條件返回 (放在所有 Hooks 之後)
 
-        {/* 右側編輯區 */}
-        <div className="col-span-3">
-          {/* 客戶資訊 */}
-          <QuoteEditor />
-          
-          {/* 品項列表 */}
-          <ItemsEditor quote={activeQuote} updateQuote={updateQuote} />
+  // 當前報價單不存在時的畫面
+  if (!activeQuote) {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-4">工程報價系統</h1>
+        <div className="grid grid-cols-4 gap-6">
+          <div className="col-span-1">
+            <CompanySelector />
+            <ModeSelector />
+            <QuoteManager />
+          </div>
+          <div className="col-span-3 p-8 bg-white rounded shadow text-center text-gray-500">
+            請在左側選單建立或選擇一份報價單開始編輯。
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* 備註/付款/總價 */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-1">
-              <NotesEditor quote={activeQuote} update={updateActiveQuote} />
-            </div>
-            <div className="col-span-1">
-              <PaymentEditor quote={activeQuote} update={updateActiveQuote} />
-            </div>
-            <div className="col-span-1">
-              <PriceSummary quote={activeQuote} update={updateActiveQuote} />
-            </div>
-          </div>
-          
-          {/* 操作按鈕區 */}
-          <div className="flex justify-end gap-4 p-4 bg-white rounded shadow no-print">
-            <button 
-              className="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 transition"
-              onClick={exportToExcel}
-            >
-              📤 匯出 Excel
-            </button>
-            <button 
-              className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 transition"
-              onClick={handlePrint}
-            >
-              🖨️ 列印/PDF 報價單
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // 3. 正常渲染
+  
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4 no-print">工程報價系統 - 編輯中：{activeQuote.title}</h1>
+
+      <div className="grid grid-cols-4 gap-6">
+        {/* 左側選單 */}
+        <div className="col-span-1">
+          <div className="p-4 bg-white rounded shadow">
+            <CompanySelector />
+            <ModeSelector />
+            <QuoteManager />
+          </div>
+        </div>
+
+        {/* 右側編輯區 */}
+        <div className="col-span-3">
+          {/* 客戶資訊 */}
+          <QuoteEditor />
+          
+          {/* 品項列表 */}
+          <ItemsEditor quote={activeQuote} updateQuote={updateQuote} />
+
+          {/* 備註/付款/總價 */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-1">
+              <NotesEditor quote={activeQuote} update={updateActiveQuote} />
+            </div>
+            <div className="col-span-1">
+              <PaymentEditor quote={activeQuote} update={updateActiveQuote} />
+            </div>
+            <div className="col-span-1">
+              <PriceSummary quote={activeQuote} update={updateActiveQuote} />
+            </div>
+          </div>
+          
+          {/* 操作按鈕區 */}
+          <div className="flex justify-end gap-4 p-4 bg-white rounded shadow no-print">
+            <button 
+              className="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 transition"
+              onClick={exportToExcel}
+            >
+              📤 匯出 Excel
+            </button>
+            <button 
+              className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 transition"
+              onClick={handlePrint}
+            >
+              🖨️ 列印/PDF 報價單
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // --------------------------------------------------
@@ -1534,10 +1544,7 @@ function App() {
 // --------------------------------------------------
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <AppProvider>
-    <App />
-  </AppProvider>
+  <AppProvider>
+    <App />
+  </AppProvider>
 );
-</script>
-</body>
-</html>
