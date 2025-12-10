@@ -1487,9 +1487,10 @@ function App() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4 no-print">工程報價系統 - 編輯中：{activeQuote.title}</h1>
 
-      <div className="grid grid-cols-4 gap-6">
-        {/* 左側選單 */}
-        <div className="col-span-1">
+      {/* VVVV 修正佈局：將 grid-cols-4 替換為 flex VVVV */}
+      <div className="flex gap-6"> 
+        {/* 左側選單：使用固定的 w-64 寬度，並確保不被壓縮 (flex-shrink-0) */}
+        <div className="w-64 flex-shrink-0"> 
           <div className="p-4 bg-white rounded shadow">
             <CompanySelector />
             <ModeSelector />
@@ -1497,8 +1498,8 @@ function App() {
           </div>
         </div>
 
-        {/* 右側編輯區 */}
-        <div className="col-span-3">
+        {/* 右側編輯區：佔用剩餘的所有空間 (flex-grow) */}
+        <div className="flex-grow"> 
           {/* 客戶資訊 */}
           <QuoteEditor />
           
