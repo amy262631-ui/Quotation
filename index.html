@@ -584,488 +584,493 @@ function QuoteManager() {
  ****************************************************/
 
 function QuoteEditor() {
-  const {
-    company,
-    activeQuote, // 直接取用 activeQuote
-    updateQuote
-  } = React.useContext(AppContext);
+  const {
+    company,
+    activeQuote, // 直接取用 activeQuote
+    updateQuote
+  } = React.useContext(AppContext);
 
-  const quote = activeQuote;
-  if (!quote) return null;
+  const quote = activeQuote;
 
-  // 引用 P1 的全局數據
-  const info = COMPANY_DATA[company];
+  /* -------------------------------
+   * 更新欄位 (Hooks 必須放在頂層)
+   * ------------------------------- */
+  const update = React.useCallback((field, value) => {
+    // 確保 quote 存在再呼叫 updateQuote
+    if (quote) {
+      updateQuote(quote.id, { [field]: value });
+    }
+  }, [quote, updateQuote]); // 依賴項改為 quote 物件
 
-  /* -------------------------------
-     更新欄位
-     ------------------------------- */
-  const update = React.useCallback((field, value) => {
-    updateQuote(quote.id, { [field]: value });
-  }, [quote.id, updateQuote]);
+  // 如果 quote 不存在，提早返回 (放在所有 Hooks 之後)
+  if (!quote) return null;
 
-  return (
-    <div className="bg-white p-6 shadow rounded mb-6 no-print">
+  // 引用 P1 的全局數據
+  const info = COMPANY_DATA[company];
 
-      {/* ---------------- 公司名稱 ---------------- */}
-      <div className="text-2xl font-bold mb-4 text-blue-800">
-        {info.name}
-      </div>
+  return (
+    <div className="bg-white p-6 shadow rounded mb-6 no-print">
 
-      {/* ---------------- 公司資料 ---------------- */}
-      <div className="text-sm text-gray-600 mb-6 border-b pb-4">
-        <div>地址：{info.address}</div>
-        <div>電話：{info.tel} | 傳真：{info.fax}</div>
-      </div>
+      {/* ---------------- 公司名稱 ---------------- */}
+      <div className="text-2xl font-bold mb-4 text-blue-800">
+        {info.name}
+      </div>
 
-      {/* ---------------- 報價單標題 & 編號 ---------------- */}
-      <div className="flex items-end gap-4 mb-6">
-        <div className="flex-1">
-          <label className="block text-sm text-gray-600 mb-1">工程名稱</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            value={quote.title || ""}
-            onChange={(e) => update("title", e.target.value)}
-          />
-        </div>
+      {/* ---------------- 公司資料 ---------------- */}
+      <div className="text-sm text-gray-600 mb-6 border-b pb-4">
+        <div>地址：{info.address}</div>
+        <div>電話：{info.tel} | 傳真：{info.fax}</div>
+      </div>
 
-        <div className="w-48">
-          <label className="block text-sm text-gray-600 mb-1">報價單編號</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 bg-gray-100"
-            value={quote.quoteNo || ""}
-            readOnly
-          />
-        </div>
-      </div>
+      {/* ---------------- 報價單標題 & 編號 ---------------- */}
+      <div className="flex items-end gap-4 mb-6">
+        <div className="flex-1">
+          <label className="block text-sm text-gray-600 mb-1">工程名稱</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            value={quote.title || ""}
+            onChange={(e) => update("title", e.target.value)}
+          />
+        </div>
 
-      {/* ---------------- 客戶資訊 ---------------- */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="w-48">
+          <label className="block text-sm text-gray-600 mb-1">報價單編號</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 bg-gray-100"
+            value={quote.quoteNo || ""}
+            readOnly
+          />
+        </div>
+      </div>
 
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">客戶名稱</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            value={quote.customerName || ""}
-            onChange={(e) => update("customerName", e.target.value)}
-          />
-        </div>
+      {/* ---------------- 客戶資訊 ---------------- */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
 
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">聯絡人</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            value={quote.contact || ""}
-            onChange={(e) => update("contact", e.target.value)}
-          />
-        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">客戶名稱</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            value={quote.customerName || ""}
+            onChange={(e) => update("customerName", e.target.value)}
+          />
+        </div>
 
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">電話</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            value={quote.phone || ""}
-            onChange={(e) => update("phone", e.target.value)}
-          />
-        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">聯絡人</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            value={quote.contact || ""}
+            onChange={(e) => update("contact", e.target.value)}
+          />
+        </div>
 
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">報價日期</label>
-          <input
-            type="date"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            // date 欄位使用 yyyy-mm-dd 格式
-            value={quote.date || formatDate()}
-            onChange={(e) => update("date", e.target.value)}
-          />
-        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">電話</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            value={quote.phone || ""}
+            onChange={(e) => update("phone", e.target.value)}
+          />
+        </div>
 
-        <div className="col-span-2">
-          <label className="block text-sm text-gray-600 mb-1">工程地點</label>
-          <input
-            type="text"
-            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-            value={quote.location || ""}
-            onChange={(e) => update("location", e.target.value)}
-          />
-        </div>
-      </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">報價日期</label>
+          <input
+            type="date"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            // date 欄位使用 yyyy-mm-dd 格式
+            value={quote.date || formatDate()}
+            onChange={(e) => update("date", e.target.value)}
+          />
+        </div>
 
-    </div>
-  );
+        <div className="col-span-2">
+          <label className="block text-sm text-gray-600 mb-1">工程地點</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+            value={quote.location || ""}
+            onChange={(e) => update("location", e.target.value)}
+          />
+        </div>
+      </div>
+
+    </div>
+  );
 }
 
 /****************************************************
- * P4-3（A）NoteSubItemBlock — 文字補充小項
- ****************************************************/
+ * P4-3（A）NoteSubItemBlock — 文字補充小項
+ ****************************************************/
 function NoteSubItemBlock({ sub, updateField, deleteSubItem }) {
-  return (
-    <div className="border rounded p-3 bg-gray-50 mb-2">
+  return (
+    <div className="border rounded p-3 bg-gray-50 mb-2">
 
-      {/* 標題 + 刪除 */}
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-bold text-gray-700">📄 補充文字</span>
-        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>
-          刪除
-        </button>
-      </div>
+      {/* 標題 + 刪除 */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold text-gray-700">📄 補充文字</span>
+        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>
+          刪除
+        </button>
+      </div>
 
-      <textarea
-        className="w-full border rounded p-2 text-sm focus:ring focus:ring-yellow-100"
-        rows="2"
-        value={sub.text || ""}
-        onChange={(e) => updateField("text", e.target.value)}
-        placeholder="輸入補充說明…"
-      />
-    </div>
-  );
+      <textarea
+        className="w-full border rounded p-2 text-sm focus:ring focus:ring-yellow-100"
+        rows="2"
+        value={sub.text || ""}
+        onChange={(e) => updateField("text", e.target.value)}
+        placeholder="輸入補充說明…"
+      />
+    </div>
+  );
 }
 
 
 /****************************************************
- * P4-3（B）ItemSubItemBlock — 子項目（含數量/單價）
- ****************************************************/
+ * P4-3（B）ItemSubItemBlock — 子項目（含數量/單價）
+ ****************************************************/
 function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
-  // 計算並格式化小計
-  const subtotal = formatMoney(calcAmount(sub));
-  
-  // 處理數字輸入
-  const handleNumberChange = React.useCallback((field, value) => {
-    // 只允許數字或空字串
-    if (value === "" || !isNaN(Number(value))) {
-      updateField(field, value);
-    }
-  }, [updateField]);
+  // 計算並格式化小計
+  const subtotal = formatMoney(calcAmount(sub));
 
-  return (
-    <div className="border rounded p-3 bg-gray-50 mb-2">
+  // 處理數字輸入 (Hooks 必須放在頂層)
+  const handleNumberChange = React.useCallback((field, value) => {
+    // 只允許數字或空字串
+    if (value === "" || !isNaN(Number(value))) {
+      updateField(field, value);
+    }
+  }, [updateField]);
 
-      {/* 標題 + 刪除 */}
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-bold text-gray-700">📦 子項目</span>
-        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>
-          刪除
-        </button>
-      </div>
+  return (
+    <div className="border rounded p-3 bg-gray-50 mb-2">
 
-      <div className="grid grid-cols-12 gap-2 text-sm items-center">
+      {/* 標題 + 刪除 */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold text-gray-700">📦 子項目</span>
+        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>
+          刪除
+        </button>
+      </div>
 
-        {/* 名稱 */}
-        <input
-          className="border p-1 rounded col-span-3 focus:ring focus:ring-blue-100"
-          value={sub.name || ""}
-          placeholder="名稱"
-          onChange={(e) => updateField("name", e.target.value)}
-        />
+      <div className="grid grid-cols-12 gap-2 text-sm items-center">
 
-        {/* 規格 */}
-        <input
-          className="border p-1 rounded col-span-4 focus:ring focus:ring-blue-100"
-          value={sub.spec || ""}
-          placeholder="規格"
-          onChange={(e) => updateField("spec", e.target.value)}
-        />
+        {/* 名稱 */}
+        <input
+          className="border p-1 rounded col-span-3 focus:ring focus:ring-blue-100"
+          value={sub.name || ""}
+          placeholder="名稱"
+          onChange={(e) => updateField("name", e.target.value)}
+        />
 
-        {/* 單位 */}
-        <input
-          className="border p-1 rounded col-span-1 text-center focus:ring focus:ring-blue-100"
-          value={sub.unit || ""}
-          placeholder="單位"
-          onChange={(e) => updateField("unit", e.target.value)}
-        />
+        {/* 規格 */}
+        <input
+          className="border p-1 rounded col-span-4 focus:ring focus:ring-blue-100"
+          value={sub.spec || ""}
+          placeholder="規格"
+          onChange={(e) => updateField("spec", e.target.value)}
+        />
 
-        {/* 數量 */}
-        <input
-          className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-blue-100"
-          value={sub.qty || ""}
-          placeholder="數量"
-          type="number"
-          min="0"
-          onChange={(e) => handleNumberChange("qty", e.target.value)}
-        />
+        {/* 單位 */}
+        <input
+          className="border p-1 rounded col-span-1 text-center focus:ring focus:ring-blue-100"
+          value={sub.unit || ""}
+          placeholder="單位"
+          onChange={(e) => updateField("unit", e.target.value)}
+        />
 
-        {/* 單價 */}
-        <input
-          className="border p-1 rounded col-span-2 text-right focus:ring focus:ring-blue-100"
-          value={sub.price || ""}
-          placeholder="單價"
-          type="number"
-          min="0"
-          onChange={(e) => handleNumberChange("price", e.target.value)}
-        />
+        {/* 數量 */}
+        <input
+          className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-blue-100"
+          value={sub.qty || ""}
+          placeholder="數量"
+          type="number"
+          min="0"
+          onChange={(e) => handleNumberChange("qty", e.target.value)}
+        />
 
-        {/* 小計 */}
-        <div className="col-span-1 text-right font-bold text-blue-600">
-          {subtotal}
-        </div>
-      </div>
-    </div>
-  );
+        {/* 單價 */}
+        <input
+          className="border p-1 rounded col-span-2 text-right focus:ring focus:ring-blue-100"
+          value={sub.price || ""}
+          placeholder="單價"
+          type="number"
+          min="0"
+          onChange={(e) => handleNumberChange("price", e.target.value)}
+        />
+
+        {/* 小計 */}
+        <div className="col-span-1 text-right font-bold text-blue-600">
+          {subtotal}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 
 /****************************************************
- * P4-3（C）ImageSubItemBlock — 圖片小項
- ****************************************************/
+ * P4-3（C）ImageSubItemBlock — 圖片小項
+ ****************************************************/
 function ImageSubItemBlock({ sub, updateField, deleteSubItem }) {
+  // 圖片上傳處理 (不是 Hook，不需要提升)
+  function handleUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  function handleUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateField("src", reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = ''; // 清空檔案輸入，以便重新選擇同一檔案
+  }
 
-    const reader = new FileReader();
-    reader.onload = () => updateField("src", reader.result);
-    reader.readAsDataURL(file);
-    e.target.value = ''; // 清空檔案輸入，以便重新選擇同一檔案
-  }
+  return (
+    <div className="border rounded p-3 bg-gray-50 mb-2">
 
-  return (
-    <div className="border rounded p-3 bg-gray-50 mb-2">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-bold text-gray-700">📷 圖片補充</span>
+        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>刪除</button>
+      </div>
 
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-bold text-gray-700">📷 圖片補充</span>
-        <button className="text-red-600 text-sm hover:text-red-800" onClick={deleteSubItem}>刪除</button>
-      </div>
+      {/*圖片預覽*/}
+      {sub.src ? (
+        <img src={sub.src} className="max-w-xs mb-2 border rounded shadow" alt="預覽圖" />
+      ) : (
+        <div className="text-gray-500 text-sm mb-2 p-2 border border-dashed rounded bg-white">尚未上傳圖片</div>
+      )}
 
-      {/*圖片預覽*/}
-      {sub.src ? (
-        <img src={sub.src} className="max-w-xs mb-2 border rounded shadow" alt="預覽圖" />
-      ) : (
-        <div className="text-gray-500 text-sm mb-2 p-2 border border-dashed rounded bg-white">尚未上傳圖片</div>
-      )}
-
-      {/* 上傳按鈕 */}
-      <label className="cursor-pointer text-blue-700 underline text-sm hover:text-blue-900">
-        {sub.src ? "更換圖片" : "上傳圖片"}
-        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-      </label>
-    </div>
-  );
+      {/* 上傳按鈕 */}
+      <label className="cursor-pointer text-blue-700 underline text-sm hover:text-blue-900">
+        {sub.src ? "更換圖片" : "上傳圖片"}
+        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+      </label>
+    </div>
+  );
 }
 
 
 /****************************************************
- * P4-3（D）UploadImageButton — 在底部新增圖片用
- ****************************************************/
+ * P4-3（D）UploadImageButton — 在底部新增圖片用
+ ****************************************************/
 function UploadImageButton({ onUpload }) {
+  // 圖片上傳處理 (不是 Hook，不需要提升)
+  function handleSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  function handleSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onUpload(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = ''; // 清空檔案輸入，以便重新選擇同一檔案
+  }
 
-    const reader = new FileReader();
-    reader.onload = () => onUpload(reader.result);
-    reader.readAsDataURL(file);
-    e.target.value = ''; // 清空檔案輸入，以便重新選擇同一檔案
-  }
-
-  return (
-    <label className="cursor-pointer text-blue-600 hover:text-blue-800 transition">
-      ＋補充圖片
-      <input type="file" accept="image/*" className="hidden" onChange={handleSelect} />
-    </label>
-  );
+  return (
+    <label className="cursor-pointer text-blue-600 hover:text-blue-800 transition">
+      ＋補充圖片
+      <input type="file" accept="image/*" className="hidden" onChange={handleSelect} />
+    </label>
+  );
 }
 
 
 /****************************************************
- * P4-3（E）SubItemWrapper — 自動分流小項類型
- ****************************************************/
-// parentItem/quote/updateQuote 這些 props 其實可以從 AppContext 取得，
-// 但為了維持您原有的傳遞方式，這裡保留。
+ * P4-3（E）SubItemWrapper — 自動分流小項類型
+ ****************************************************/
 function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 
-  // 更新某個 subItem 的特定欄位
-  const updateField = React.useCallback((field, value) => {
-    const newItems = quote.items.map(m =>
-      m.id === parentItem.id
-        ? {
-            ...m,
-            // 確保 subItems 存在
-            subItems: (m.subItems || []).map(s =>
-              s.id === subItem.id ? { ...s, [field]: value } : s
-            )
-          }
-        : m
-    );
-    updateQuote(quote.id, { items: newItems });
-  }, [quote.id, parentItem.id, subItem.id, quote.items, updateQuote]);
+  // 更新某個 subItem 的特定欄位 (Hooks 必須放在頂層)
+  const updateField = React.useCallback((field, value) => {
+    const newItems = quote.items.map(m =>
+      m.id === parentItem.id
+        ? {
+          ...m,
+          // 確保 subItems 存在
+          subItems: (m.subItems || []).map(s =>
+            s.id === subItem.id ? { ...s, [field]: value } : s
+          )
+        }
+        : m
+    );
+    updateQuote(quote.id, { items: newItems });
+  }, [quote.id, parentItem.id, subItem.id, quote.items, updateQuote]);
 
-  // 刪除 subItem
-  const deleteSubItem = React.useCallback(() => {
-    const newItems = quote.items.map(m =>
-      m.id === parentItem.id
-        ? { ...m, subItems: (m.subItems || []).filter(s => s.id !== subItem.id) }
-        : m
-    );
-    updateQuote(quote.id, { items: newItems });
-  }, [quote.id, parentItem.id, subItem.id, quote.items, updateQuote]);
+  // 刪除 subItem (Hooks 必須放在頂層)
+  const deleteSubItem = React.useCallback(() => {
+    const newItems = quote.items.map(m =>
+      m.id === parentItem.id
+        ? { ...m, subItems: (m.subItems || []).filter(s => s.id !== subItem.id) }
+        : m
+    );
+    updateQuote(quote.id, { items: newItems });
+  }, [quote.id, parentItem.id, subItem.id, quote.items, updateQuote]);
 
-  const props = { sub: subItem, updateField, deleteSubItem };
+  const props = { sub: subItem, updateField, deleteSubItem };
 
-  if (subItem.type === "note") return <NoteSubItemBlock {...props} />;
-  if (subItem.type === "item") return <ItemSubItemBlock {...props} />;
-  if (subItem.type === "image") return <ImageSubItemBlock {...props} />;
+  if (subItem.type === "note") return <NoteSubItemBlock {...props} />;
+  if (subItem.type === "item") return <ItemSubItemBlock {...props} />;
+  if (subItem.type === "image") return <ImageSubItemBlock {...props} />;
 
-  return null;
+  return null;
 }
 
 
 /****************************************************
- * P4-3（F）MainItemBlock — 大項編輯
- ****************************************************/
+ * P4-3（F）MainItemBlock — 大項編輯
+ ****************************************************/
 function MainItemBlock({ item, quote, updateQuote }) {
 
-  // 處理數字輸入
-  const handleNumberChange = React.useCallback((field, value) => {
-    if (value === "" || !isNaN(Number(value))) {
-      update({ [field]: value });
-    }
-  }, [item.id, updateQuote]);
+  // 1. 處理數字輸入 (Hooks 必須放在頂層)
+  const handleNumberChange = React.useCallback((field, value) => {
+    if (value === "" || !isNaN(Number(value))) {
+      update({ [field]: value });
+    }
+  }, [item.id, updateQuote]);
 
-  const update = React.useCallback((data) => {
-    const newItems = quote.items.map(m =>
-      m.id === item.id ? { ...m, ...data } : m
-    );
-    updateQuote(quote.id, { items: newItems });
-  }, [quote.id, item.id, quote.items, updateQuote]);
+  // 2. 更新大項資料 (Hooks 必須放在頂層)
+  const update = React.useCallback((data) => {
+    const newItems = quote.items.map(m =>
+      m.id === item.id ? { ...m, ...data } : m
+    );
+    updateQuote(quote.id, { items: newItems });
+  }, [quote.id, item.id, quote.items, updateQuote]);
 
-  const deleteMain = React.useCallback(() => {
-    if (!confirm("確定要刪除此大項？")) return;
-    updateQuote(quote.id, { items: quote.items.filter(m => m.id !== item.id) });
-  }, [quote.id, item.id, quote.items, updateQuote]);
+  // 3. 刪除大項 (Hooks 必須放在頂層)
+  const deleteMain = React.useCallback(() => {
+    if (!confirm("確定要刪除此大項？")) return;
+    updateQuote(quote.id, { items: quote.items.filter(m => m.id !== item.id) });
+  }, [quote.id, item.id, quote.items, updateQuote]);
 
-  // 新增小項（含圖片）
-  const addSub = React.useCallback((type, src = "") => {
-    const newSub = {
-      id: uuid(),
-      type,
-      text: "",
-      name: "",
-      spec: "",
-      unit: "",
-      qty: "",
-      price: "",
-      src
-    };
+  // 4. 新增小項 (Hooks 必須放在頂層)
+  const addSub = React.useCallback((type, src = "") => {
+    const newSub = {
+      id: uuid(),
+      type,
+      text: "",
+      name: "",
+      spec: "",
+      unit: "",
+      qty: "",
+      price: "",
+      src
+    };
 
-    const newItems = quote.items.map(m =>
-      m.id === item.id ? { ...m, subItems: [...(m.subItems || []), newSub] } : m
-    );
+    const newItems = quote.items.map(m =>
+      m.id === item.id ? { ...m, subItems: [...(m.subItems || []), newSub] } : m
+    );
 
-    updateQuote(quote.id, { items: newItems });
-  }, [quote.id, item.id, quote.items, updateQuote]);
+    updateQuote(quote.id, { items: newItems });
+  }, [quote.id, item.id, quote.items, updateQuote]);
 
-  // 計算並格式化小計
-  const mainTotal = formatMoney(calcAmount(item));
-  
-  return (
-    <div className="border rounded p-4 bg-white shadow mb-4">
+  // 計算並格式化小計 (不是 Hook，放在 Hook 之後)
+  const mainTotal = formatMoney(calcAmount(item));
 
-      {/* 大項資料列 */}
-      <div className="grid grid-cols-12 gap-2 items-center">
-        {/* 品名 */}
-        <input className="border p-1 rounded col-span-3 focus:ring focus:ring-red-100"
-          value={item.name || ""} placeholder="品名"
-          onChange={(e) => update({ name: e.target.value })} />
-        {/* 規格 */}
-        <input className="border p-1 rounded col-span-3 focus:ring focus:ring-red-100"
-          value={item.spec || ""} placeholder="規格"
-          onChange={(e) => update({ spec: e.target.value })} />
-        {/* 單位 */}
-        <input className="border p-1 rounded col-span-1 text-center focus:ring focus:ring-red-100"
-          value={item.unit || ""} placeholder="單位"
-          onChange={(e) => update({ unit: e.target.value })} />
-        {/* 數量 */}
-        <input className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-red-100"
-          value={item.qty || ""} placeholder="數量"
-          type="number" min="0"
-          onChange={(e) => handleNumberChange("qty", e.target.value)} />
-        {/* 單價 */}
-        <input className="border p-1 rounded col-span-2 text-right focus:ring focus:ring-red-100"
-          value={item.price || ""} placeholder="單價"
-          type="number" min="0"
-          onChange={(e) => handleNumberChange("price", e.target.value)} />
+  return (
+    <div className="border rounded p-4 bg-white shadow mb-4">
 
-        {/* 小計 */}
-        <div className="text-right font-bold col-span-1 text-red-700">
-          {mainTotal}
-        </div>
-        {/* 刪除按鈕 */}
-        <button className="text-red-600 col-span-1 text-sm hover:text-red-800" onClick={deleteMain}>
-          ✕
-        </button>
-      </div>
+      {/* 大項資料列 */}
+      <div className="grid grid-cols-12 gap-2 items-center">
+        {/* 品名 */}
+        <input className="border p-1 rounded col-span-3 focus:ring focus:ring-red-100"
+          value={item.name || ""} placeholder="品名"
+          onChange={(e) => update({ name: e.target.value })} />
+        {/* 規格 */}
+        <input className="border p-1 rounded col-span-3 focus:ring focus:ring-red-100"
+          value={item.spec || ""} placeholder="規格"
+          onChange={(e) => update({ spec: e.target.value })} />
+        {/* 單位 */}
+        <input className="border p-1 rounded col-span-1 text-center focus:ring focus:ring-red-100"
+          value={item.unit || ""} placeholder="單位"
+          onChange={(e) => update({ unit: e.target.value })} />
+        {/* 數量 */}
+        <input className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-red-100"
+          value={item.qty || ""} placeholder="數量"
+          type="number" min="0"
+          onChange={(e) => handleNumberChange("qty", e.target.value)} />
+        {/* 單價 */}
+        <input className="border p-1 rounded col-span-2 text-right focus:ring focus:ring-red-100"
+          value={item.price || ""} placeholder="單價"
+          type="number" min="0"
+          onChange={(e) => handleNumberChange("price", e.target.value)} />
 
-      {/* 小項列表 */}
-      <div className="mt-3 border-t pt-3">
-        {(item.subItems || []).map(sub => ( // 確保 subItems 存在
-          <SubItemWrapper
-            key={sub.id} // 修正：新增 key
-            subItem={sub}
-            parentItem={item}
-            quote={quote}
-            updateQuote={updateQuote}
-          />
-        ))}
-      </div>
+        {/* 小計 */}
+        <div className="text-right font-bold col-span-1 text-red-700">
+          {mainTotal}
+        </div>
+        {/* 刪除按鈕 */}
+        <button className="text-red-600 col-span-1 text-sm hover:text-red-800" onClick={deleteMain}>
+          ✕
+        </button>
+      </div>
 
-      {/* 操作列 */}
-      <div className="flex gap-4 mt-3 text-blue-600 text-sm border-t pt-3">
-        <button className="hover:text-blue-800 transition" onClick={() => addSub("item")}>＋ 子項目</button>
-        <button className="hover:text-blue-800 transition" onClick={() => addSub("note")}>＋ 補充文字</button>
-        <UploadImageButton onUpload={(src) => addSub("image", src)} />
-      </div>
-    </div>
-  );
+      {/* 小項列表 */}
+      <div className="mt-3 border-t pt-3">
+        {(item.subItems || []).map(sub => ( // 確保 subItems 存在
+          <SubItemWrapper
+            key={sub.id} // 修正：新增 key
+            subItem={sub}
+            parentItem={item}
+            quote={quote}
+            updateQuote={updateQuote}
+          />
+        ))}
+      </div>
+
+      {/* 操作列 */}
+      <div className="flex gap-4 mt-3 text-blue-600 text-sm border-t pt-3">
+        <button className="hover:text-blue-800 transition" onClick={() => addSub("item")}>＋ 子項目</button>
+        <button className="hover:text-blue-800 transition" onClick={() => addSub("note")}>＋ 補充文字</button>
+        <UploadImageButton onUpload={(src) => addSub("image", src)} />
+      </div>
+    </div>
+  );
 }
 
 
 /****************************************************
- * P4-3（G）ItemsEditor — 整體品項管理
- ****************************************************/
+ * P4-3（G）ItemsEditor — 整體品項管理
+ ****************************************************/
 function ItemsEditor({ quote, updateQuote }) {
-  const addMain = React.useCallback(() => {
-    const newMain = {
-      id: uuid(),
-      type: "main",
-      name: "未命名大項",
-      spec: "",
-      unit: "",
-      qty: "",
-      price: "",
-      subItems: []
-    };
-    updateQuote(quote.id, { items: [...(quote.items || []), newMain] });
-  }, [quote.id, quote.items, updateQuote]);
+  // 1. 新增大項 (Hooks 必須放在頂層)
+  const addMain = React.useCallback(() => {
+    const newMain = {
+      id: uuid(),
+      type: "main",
+      name: "未命名大項",
+      spec: "",
+      unit: "",
+      qty: "",
+      price: "",
+      subItems: []
+    };
+    updateQuote(quote.id, { items: [...(quote.items || []), newMain] });
+  }, [quote.id, quote.items, updateQuote]);
 
-  return (
-    <div className="mb-6 no-print">
-      <h2 className="font-bold text-lg mb-2">報價項目列表</h2>
-      
-      <button
-        className="px-4 py-2 bg-blue-600 text-white rounded mb-4 hover:bg-blue-700 transition"
-        onClick={addMain}
-      >
-        ＋ 新增大項
-      </button>
+  return (
+    <div className="mb-6 no-print">
+      <h2 className="font-bold text-lg mb-2">報價項目列表</h2>
+      
+      <button
+        className="px-4 py-2 bg-blue-600 text-white rounded mb-4 hover:bg-blue-700 transition"
+        onClick={addMain}
+      >
+        ＋ 新增大項
+      </button>
 
-      {(quote.items || []).map(item => ( // 確保 items 存在
-        <MainItemBlock
-          key={item.id}
-          item={item}
-          quote={quote}
-          updateQuote={updateQuote}
-        />
-      ))}
-    </div>
-  );
+      {(quote.items || []).map(item => ( // 確保 items 存在
+        <MainItemBlock
+          key={item.id}
+          item={item}
+          quote={quote}
+          updateQuote={updateQuote}
+        />
+      ))}
+    </div>
+  );
 }
-
 /****************************************************
  * P4-4（A）— 備註欄 NotesEditor
  ****************************************************/
