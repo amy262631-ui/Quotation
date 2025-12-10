@@ -946,25 +946,28 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 }
 
 
-/****************************************************
- * P4-3（F）MainItemBlock — 大項編輯
+****************************************************
+ * P4-3（F）MainItemBlock — 大項編輯 (修正版)
  ****************************************************/
 function MainItemBlock({ item, quote, updateQuote }) {
 
-  // 1. 處理數字輸入 (Hooks 必須放在頂層)
-  const handleNumberChange = React.useCallback((field, value) => {
-    if (value === "" || !isNaN(Number(value))) {
-      update({ [field]: value });
-    }
-  }, [item.id, updateQuote]);
-
-  // 2. 更新大項資料 (Hooks 必須放在頂層)
+  // 1. 更新大項資料 (Hooks 必須放在頂層)
   const update = React.useCallback((data) => {
+    // 確保只更新當前項目
     const newItems = quote.items.map(m =>
       m.id === item.id ? { ...m, ...data } : m
     );
     updateQuote(quote.id, { items: newItems });
   }, [quote.id, item.id, quote.items, updateQuote]);
+
+  // 2. 處理數字輸入 (Hooks 必須放在頂層)
+  const handleNumberChange = React.useCallback((field, value) => {
+    // 允許空字串或數字
+    if (value === "" || !isNaN(Number(value))) {
+      // 確保將變更傳遞給 update
+      update({ [field]: value });
+    }
+  }, [update]); // <--- 確保依賴項是 update 
 
   // 3. 刪除大項 (Hooks 必須放在頂層)
   const deleteMain = React.useCallback(() => {
@@ -998,6 +1001,17 @@ function MainItemBlock({ item, quote, updateQuote }) {
 
   return (
     <div className="border rounded p-4 bg-white shadow mb-4">
+
+      {/* VVVV 標題行：新增標籤 VVVV */}
+      <div className="grid grid-cols-12 gap-2 text-sm font-bold text-gray-600 mb-2 border-b pb-1">
+          <div className="col-span-3">品名</div>
+          <div className="col-span-3">規格</div>
+          <div className="col-span-1 text-center">單位</div>
+          <div className="col-span-1 text-right">數量</div>
+          <div className="col-span-2 text-right">單價</div>
+          <div className="col-span-1 text-right">小計</div>
+          <div className="col-span-1"></div> {/* 刪除按鈕欄位 */}
+      </div>
 
       {/* 大項資料列 */}
       <div className="grid grid-cols-12 gap-2 items-center">
@@ -1038,7 +1052,7 @@ function MainItemBlock({ item, quote, updateQuote }) {
       <div className="mt-3 border-t pt-3">
         {(item.subItems || []).map(sub => ( // 確保 subItems 存在
           <SubItemWrapper
-            key={sub.id} // 修正：新增 key
+            key={sub.id} 
             subItem={sub}
             parentItem={item}
             quote={quote}
@@ -1056,8 +1070,6 @@ function MainItemBlock({ item, quote, updateQuote }) {
     </div>
   );
 }
-
-
 /****************************************************
  * P4-3（G）ItemsEditor — 整體品項管理
  ****************************************************/
