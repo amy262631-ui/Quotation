@@ -406,7 +406,7 @@ function AppProvider({ children }) {
                 ...item, 
                 id: uuid(), 
                 subItems: [],
-                // 🎯 修正 6：新增 specMain (主規格), specMaterial (用料), remarks (備註)
+                // 🎯 修正：新增 specMain (主規格), specMaterial (用料), remarks (備註)
                 specMain: "", 
                 specMaterial: "", 
                 remarks: ""
@@ -456,7 +456,7 @@ function AppProvider({ children }) {
             ...item, 
             id: uuid(), 
             subItems: [],
-            // 🎯 修正 6：新增 specMain (主規格), specMaterial (用料), remarks (備註)
+            // 🎯 修正：新增 specMain (主規格), specMaterial (用料), remarks (備註)
             specMain: "", 
             specMaterial: "", 
             remarks: ""
@@ -812,7 +812,7 @@ function NoteSubItemBlock({ sub, updateField, deleteSubItem }) {
 // P4-3（X）SpecItemSuggest — 規格品自動建議元件
 function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
     
-    // 🎯 修正 6：規格品欄位結構
+    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
@@ -871,7 +871,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
 function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
     const { specItems } = React.useContext(AppContext); // 取得規格品列表
     
-    // 🎯 修正 6：規格品欄位結構
+    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
@@ -895,12 +895,19 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
     // 🎯 處理規格品選擇
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        const materialSpec = `${spec[FIELD_MATERIAL_1] || ''} ${spec[FIELD_MATERIAL_2] || ''} ${spec[FIELD_MATERIAL_3] || ''}`.trim();
-        
+        // 🎯 關鍵修正 3：確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        const materialParts = [
+            spec[FIELD_MATERIAL_1] || '',
+            spec[FIELD_MATERIAL_2] || '',
+            spec[FIELD_MATERIAL_3] || ''
+        ].filter(p => p.trim() !== ''); // 過濾空字串和純空白
+
+        const materialSpec = materialParts.join(' / ').trim(); // 使用 / 分隔
+
         // 從規格品數據自動填入規格、單位、單價
         updateField("name", spec['品名'] || sub.name);
         
-        // 🎯 修正 6：將資料拆分到新欄位
+        // 🎯 修正：將資料拆分到新欄位
         updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格
         updateField("specMaterial", materialSpec); // 用料 1 2 3 合併
         updateField("remarks", spec[FIELD_REMARKS] || ""); // 備註
@@ -923,7 +930,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                 
             </div>
 
-            {/* 🎯 修正 6：編輯器欄位排版 */}
+            {/* 🎯 修正：編輯器欄位排版 */}
             {/* 3 (名稱) | 2 (規格) | 1 (單位) | 1 (數量) | 1 (單價) | 2 (備註) | 1 (小計) | (Delete button is separate) */}
             <div className="grid grid-cols-12 gap-2 text-sm items-center relative">
 
@@ -952,7 +959,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                     )}
                 </div>
 
-                {/* 規格 (col-span-2) - 🎯 修正 6：名稱改為 '規格' */}
+                {/* 規格 (col-span-2) - 🎯 修正：名稱改為 '規格' */}
                 <input
                     className="border p-1 rounded col-span-2 focus:ring focus:ring-blue-100" // 寬度改為 col-span-2
                     value={sub.specMain || ""}
@@ -1002,7 +1009,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                 </div>
             </div>
 
-            {/* 🎯 修正 6：新增 用料明細 顯示 */}
+            {/* 🎯 修正：新增 用料明細 顯示 */}
             {(sub.specMaterial || "").length > 0 && (
                 <div className="mt-1 ml-4 text-xs text-gray-500 italic">
                     用料明細: {sub.specMaterial}
@@ -1116,7 +1123,7 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index 屬性
     const { specItems } = React.useContext(AppContext);
     
-    // 🎯 修正 6：規格品欄位結構
+    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
@@ -1153,7 +1160,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
             type,
             text: "",
             name: "",
-            // 🎯 修正 6：子項目也新增欄位
+            // 🎯 修正：子項目也新增欄位
             specMain: "", 
             specMaterial: "",
             remarks: "",
@@ -1173,12 +1180,19 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
     // 🎯 處理規格品選擇
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        const materialSpec = `${spec[FIELD_MATERIAL_1] || ''} ${spec[FIELD_MATERIAL_2] || ''} ${spec[FIELD_MATERIAL_3] || ''}`.trim();
-        
+        // 🎯 關鍵修正 3：確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        const materialParts = [
+            spec[FIELD_MATERIAL_1] || '',
+            spec[FIELD_MATERIAL_2] || '',
+            spec[FIELD_MATERIAL_3] || ''
+        ].filter(p => p.trim() !== ''); // 過濾空字串和純空白
+
+        const materialSpec = materialParts.join(' / ').trim(); // 使用 / 分隔
+
         // 從規格品數據自動填入規格、單位、單價
         update({
             name: spec['品名'] || item.name,
-            // 🎯 修正 6：將資料拆分到新欄位
+            // 🎯 修正：將資料拆分到新欄位
             specMain: spec[FIELD_MAIN_SPEC] || "", 
             specMaterial: materialSpec, 
             remarks: spec[FIELD_REMARKS] || "",
@@ -1239,7 +1253,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                         />
                     )}
                 </div>
-                {/* 規格 (col-span-2) - 🎯 修正 6：使用 item.specMain */}
+                {/* 規格 (col-span-2) - 🎯 修正：使用 item.specMain */}
                 <input className="border p-1 rounded col-span-2 focus:ring focus:ring-red-100 text-left"
                     value={item.specMain || ""} placeholder="規格 (主描述)"
                     onChange={(e) => update({ specMain: e.target.value })} />
@@ -1273,7 +1287,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                 </button>
             </div>
             
-            {/* 🎯 修正 6：新增 用料明細 顯示 */}
+            {/* 🎯 修正：新增 用料明細 顯示 */}
             {(item.specMaterial || "").length > 0 && (
                 <div className="mt-1 ml-4 text-xs text-gray-500 italic border-t pt-1">
                     用料明細: {item.specMaterial}
@@ -1310,7 +1324,7 @@ function ItemsEditor({ quote, updateQuote }) {
             id: uuid(),
             type: "main",
             name: "", // 預設為空字串
-            // 🎯 修正 6：初始化新欄位
+            // 🎯 修正：初始化新欄位
             specMain: "", 
             specMaterial: "",
             remarks: "",
@@ -1464,7 +1478,7 @@ function exportToExcel(quote, companyInfo) {
     const negotiated = calcNegotiated(total, quote.discountPercent, quote.negotiatedPrice);
 
     // Excel 表頭
-    // 🎯 修正 6：新增規格 (主描述)、用料明細、備註
+    // 🎯 修正：新增規格 (主描述)、用料明細、備註
     const header = [
         "項次", "品名", "規格 (主描述)", "用料明細", "單位", "數量", "單價", "金額", "備註" 
     ];
@@ -1501,7 +1515,7 @@ function exportToExcel(quote, companyInfo) {
                     sub.remarks || "" // 備註
                 ]);
             } else if (sub.type === 'note' && sub.text) {
-                // 🎯 修正 6：調整 note 的欄位數量為 9
+                // 🎯 修正：調整 note 的欄位數量為 9
                 data.push([
                     "",
                     `備註：${sub.text}`, 
@@ -1536,7 +1550,7 @@ function exportToExcel(quote, companyInfo) {
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
     // --- 設置欄位寬度 (可選) ---
-    // 🎯 修正 6：調整欄位寬度以適應 9 個欄位
+    // 🎯 修正：調整欄位寬度以適應 9 個欄位
     const wscols = [
         { wch: 6 }, { wch: 30 }, { wch: 20 }, { wch: 30 }, { wch: 8 }, 
         { wch: 8 }, { wch: 12 }, { wch: 15 }, { wch: 15 } // 9 columns
@@ -1620,11 +1634,12 @@ function PrintItemRow({ item, index, isSub = false }) {
     
     const amount = calcAmount(item);
     
-    // 🎯 修正 6：Note/Image 子項的 colSpan 必須是 7
+    // 🎯 修正：Note/Image 子項的 colSpan 必須是 7
     if (item.type === 'note' && item.text) {
         // 補充文字
         return (
             <tr className="page-break-inside-avoid">
+                {/* 使用 colSpan="7" 涵蓋所有欄位 */}
                 <td colSpan="7" style={{ borderTop: 'none', padding: '0 6px 4px 6px', fontWeight: 'normal', color: '#333' }}>
                     <span style={{ fontWeight: 'bold' }}>補充說明:</span> <span style={{ whiteSpace: 'pre-wrap' }}>{item.text}</span>
                 </td>
@@ -1634,6 +1649,7 @@ function PrintItemRow({ item, index, isSub = false }) {
         // 圖片
         return (
             <tr className="page-break-inside-avoid">
+                {/* 使用 colSpan="7" 涵蓋所有欄位 */}
                 <td colSpan="7" style={{ borderTop: 'none', padding: '4px 6px 0 6px' }}>
                     <img src={item.src} alt="工程圖片" className="print-image" />
                 </td>
@@ -1644,7 +1660,7 @@ function PrintItemRow({ item, index, isSub = false }) {
     // 標準大項或子項目
     const namePrefix = isSub ? ' ↳ ' : '';
     
-    // 🎯 修正 6：品名、規格 (主描述)、用料明細
+    // 🎯 修正：品名、規格 (主描述)、用料明細
     const itemContent = item.name || '';
     const mainSpecContent = (item.specMain && item.specMain.trim() !== '') 
                             ? ` (${item.specMain})` : '';
@@ -1743,12 +1759,12 @@ const PrintLayout = ({ quote }) => {
                 <thead>
                     <tr>
                         <th style={{ width: '5%' }}>項次</th>
-                        {/* 🎯 修正 6：品名/規格/用料 欄位寬度調整 */}
+                        {/* 🎯 修正：品名/規格/用料 欄位寬度調整 */}
                         <th style={{ width: '45%' }}>品名/規格/用料</th> 
                         <th style={{ width: '8%' }}>單位</th>
                         <th style={{ width: '8%' }}>數量</th>
                         <th style={{ width: '10%' }}>單價</th>
-                        {/* 🎯 修正 6：新增備註欄位 */}
+                        {/* 🎯 修正：新增備註欄位 */}
                         <th style={{ width: '10%' }}>備註</th>
                         <th style={{ width: '14%' }}>金額</th>
                     </tr>
