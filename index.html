@@ -782,7 +782,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect }) {
     const filteredItems = React.useMemo(() => {
         const input = (currentInput || "").toLowerCase().trim();
 
-        if (input.length < 2) return [];
+        if (input.length < 1) return [];
 
         return specItems
             .filter(item => 
