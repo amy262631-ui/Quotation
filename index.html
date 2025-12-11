@@ -793,6 +793,11 @@ function SpecItemSuggest({ currentInput, specItems, onSelect }) {
     }, [currentInput, specItems]);
 
     if (filteredItems.length === 0) return null;
+    // 處理點選：選完後呼叫 onSelect 處理數據，並呼叫 onHide 隱藏列表
+    const handleSelect = (item) => {
+        onSelect(item);
+        onHide(); // 選完後強制隱藏列表
+    };
 
     return (
         <div className="absolute z-10 top-full left-0 w-full bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -1014,6 +1019,8 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 function MainItemBlock({ item, quote, updateQuote }) {
     const { specItems } = React.useContext(AppContext);
 
+    // 🎯 變動：新增狀態來控制建議列表的顯示/隱藏
+    const [showSuggest, setShowSuggest] = React.useState(false);
     // 1. 更新大項資料 (Hooks 必須放在頂層)
     const update = React.useCallback((data) => {
         // 確保只更新當前項目
@@ -1050,7 +1057,63 @@ function MainItemBlock({ item, quote, updateQuote }) {
             price: "",
             src
         };
+// 5. 處理規格品選擇 (使用實際欄位：規格1, 單位, 單價)
+    const handleSelectSpecItem = React.useCallback((spec) => {
+        // 從規格品數據自動填入規格、單位、單價
+        update({
+            name: spec['品名'] || item.name,
+            spec: spec['規格1'] || item.spec, // <-- 使用 '規格1'
+            unit: spec['單位'] || item.unit,
+            price: spec['單價'] || item.price,
+        });
+        // 🎯 修正：選完後隱藏列表
+        setShowSuggest(false);
+    }, [update, item.name, item.spec, item.unit, item.price]);
 
+
+    // 計算並格式化小計 (不是 Hook，放在 Hook 之後)
+    const mainTotal = formatMoney(calcAmount(item));
+
+    return (
+        <div className="border rounded p-4 bg-white shadow mb-4">
+            {/* VVVV 標題行 VVVV */}
+            // ... (保持不變)
+
+            {/* 大項資料列 */}
+            <div className="grid grid-cols-12 gap-2 items-center">
+                {/* 品名 (col-span-3) - **使用 SpecItemSuggest** */}
+                <div className="col-span-3 relative">
+                    <input className="border p-1 rounded w-full focus:ring focus:ring-red-100 text-left"
+                        value={item.name || ""} placeholder="品名"
+                        onChange={(e) => {
+                            update({ name: e.target.value });
+                            // 🎯 修正：輸入時顯示建議列表
+                            setShowSuggest(true);
+                        }} 
+                        // 🎯 修正：當欄位失去焦點時，0.2 秒後隱藏建議列表
+                        onBlur={() => {
+                            // 使用 setTimeout 讓點擊事件先於 onBlur 發生
+                            setTimeout(() => setShowSuggest(false), 200); 
+                        }}
+                        // 🎯 修正：重新取得焦點時顯示建議列表 (如果輸入字數滿足條件)
+                        onFocus={() => {
+                            if ((item.name || "").length >= 1) { // 這裡也要檢查字數 >= 1
+                                setShowSuggest(true);
+                            }
+                        }}
+                    />
+                    
+                    {/* 🎯 修正：只有在 showSuggest 為 true 且輸入字數滿足條件時才渲染 */}
+                    {(item.name || "").length >= 1 && showSuggest && (
+                        <SpecItemSuggest 
+                            currentInput={item.name} 
+                            specItems={specItems} 
+                            onSelect={handleSelectSpecItem}
+                            onHide={() => setShowSuggest(false)} // 🎯 傳遞隱藏函式
+                        />
+                    )}
+                </div>
+                {/* 規格 (col-span-3) */}
         const newItems = quote.items.map(m =>
             m.id === item.id ? { ...m, subItems: [...(m.subItems || []), newSub] } : m
         );
