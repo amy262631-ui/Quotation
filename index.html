@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- V21 (最終穩定版)</title>
+    <title>工程報價系統（Herhsin & SinChang）- V22 (最終穩定版)</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
-    <script src="https://cdn.tailwindcss.com"></script>
-
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -97,7 +97,8 @@
 
         /* 圖片列印樣式 */
         .print-image {
-            max-width: 150px; 
+            /* 限制圖片在列印時不要過大 */
+            max-width: 90% !important; 
             height: auto;
             margin-top: 5px;
             display: block;
@@ -163,7 +164,8 @@ const COMPANY_DATA = {
         fax: "07-6517994",
         email: "admin@herhsin.com",
         address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "herhsin_stamp_placeholder.png", 
+        // 修正：提供一個相對路徑或可用的 URL
+        stamp: "https://via.placeholder.com/80x40?text=Herhsin+Stamp", 
         prefix: "QH" 
     },
     sinchang: {
@@ -172,7 +174,8 @@ const COMPANY_DATA = {
         fax: "07-6517994",
         email: "affairs@herhsin.com",
         address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "sinchang_stamp_placeholder.png", 
+        // 修正：提供一個相對路徑或可用的 URL
+        stamp: "https://via.placeholder.com/80x40?text=SinChang+Stamp", 
         prefix: "QS" 
     }
 };
@@ -723,7 +726,6 @@ function SpecItemSuggest({ item, updateItem, isSubItem = false }) {
     }, [searchTerm, specItems]);
 
     const handleSelectSpecItem = (specItem) => {
-        // V20 修正點: 確保規格品的備註欄位被正確抓取並賦值
         updateItem({
             name: specItem['品名'] || item.name,
             specMain: specItem['規格'] || item.specMain,
@@ -731,9 +733,7 @@ function SpecItemSuggest({ item, updateItem, isSubItem = false }) {
             price: Number(specItem['單價']) || item.price, 
             unit: specItem['單位'] || item.unit,
             
-            // ---------------------------------------------------
-            // V20 關鍵修正 1: 抓取 Google Sheet 的 '備註' 欄位
-            // ---------------------------------------------------
+            // 抓取 Google Sheet 的 '備註' 欄位
             remarks: specItem['備註'] || "" ,
             
             // 用料明細合併 
@@ -816,11 +816,14 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
         const newSub = {
             id: uuid(),
             type: type, // 'item', 'text', 'image'
-            name: type === 'text' ? '補充文字' : (type === 'image' ? '補充圖片' : '未命名子項目'),
+            name: type === 'text' ? '補充文字' : (type === 'image' ? '補充圖片' : ''), // V22: 主項目 name 設為空字串，方便輸入
             specMain: "",
             unit: "式",
             qty: 1,
-            price: 0
+            price: 0,
+            // V22 修正: 圖片專用的 URL 欄位
+            imageUrl: type === 'image' ? '' : undefined, 
+            remarks: type === 'text' ? '' : undefined
         };
         updateItem({ subItems: [...(item.subItems || []), newSub] });
     };
@@ -844,14 +847,6 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
         const isText = sub.type === 'text';
         const isImage = sub.type === 'image';
         
-        const subItemProps = {
-            item: sub,
-            index: subIndex,
-            updateItem: (data) => handleUpdateSubItem(sub.id, data),
-            deleteItem: handleDeleteSubItem,
-            isSubItem: true
-        };
-
         return (
             <div key={sub.id} className="ml-8 mt-2 p-2 bg-gray-50 border-l-4 border-gray-300 rounded">
                 <div className="flex items-start">
@@ -859,11 +854,13 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                         
                         {isItem && (
                              <>
+                                {/* 子項目 - 品名 (Suggest) */}
                                 <SpecItemSuggest 
                                     item={sub} 
                                     updateItem={(data) => handleUpdateSubItem(sub.id, data)}
                                     isSubItem={true}
                                 />
+                                {/* 規格 (主描述) */}
                                 <input
                                     type="text"
                                     value={sub.specMain}
@@ -871,6 +868,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                     placeholder="規格 (主描述)"
                                     className="border p-1 rounded text-sm"
                                 />
+                                {/* 單位 */}
                                 <input
                                     type="text"
                                     value={sub.unit}
@@ -878,6 +876,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                     placeholder="單位"
                                     className="border p-1 rounded text-sm text-center"
                                 />
+                                {/* 數量 */}
                                 <input
                                     type="number"
                                     value={sub.qty}
@@ -886,6 +885,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                     min="0"
                                     className="border p-1 rounded text-sm text-right"
                                 />
+                                {/* 單價 */}
                                 <input
                                     type="number"
                                     value={sub.price}
@@ -894,6 +894,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                     min="0"
                                     className="border p-1 rounded text-sm text-right"
                                 />
+                                {/* 小計 */}
                                 <div className="p-1 text-right font-semibold text-red-500">
                                     {formatMoney(calcAmount(sub))}
                                 </div>
@@ -905,16 +906,30 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                             <div className='col-span-6'>
                                 <input
                                     type="text"
-                                    value={sub.name}
+                                    value={sub.name} // 補充文字/圖片的標題
                                     onChange={(e) => handleUpdateSubItem(sub.id, { name: e.target.value })}
-                                    placeholder={isText ? "輸入補充文字標題" : "輸入圖片 URL"}
+                                    placeholder={isText ? "輸入補充文字標題" : "輸入圖片標題 (例如: 設備俯視圖)"}
                                     className="w-full border p-1 rounded text-sm bg-yellow-50"
                                 />
-                                {isImage && sub.name && (
-                                    <div className='mt-2'>
-                                        <img src={sub.name} alt="Preview" className="max-w-xs max-h-32 object-contain border p-1" />
-                                    </div>
+                                
+                                {isImage && (
+                                    <>
+                                    {/* V22 修正: 使用 sub.imageUrl 儲存實際 URL */}
+                                    <input
+                                        type="text"
+                                        value={sub.imageUrl} 
+                                        onChange={(e) => handleUpdateSubItem(sub.id, { imageUrl: e.target.value })}
+                                        placeholder="輸入圖片 URL 連結"
+                                        className="w-full border p-1 mt-1 rounded text-sm bg-yellow-50"
+                                    />
+                                    {sub.imageUrl && (
+                                        <div className='mt-2'>
+                                            <img src={sub.imageUrl} alt="Preview" className="max-w-xs max-h-32 object-contain border p-1" />
+                                        </div>
+                                    )}
+                                    </>
                                 )}
+                                
                                 {isText && (
                                     <textarea
                                         value={sub.remarks} // 用 remarks 欄位來放文字內容
@@ -1086,7 +1101,8 @@ function QuoteEditor() {
     const handleAddItem = () => {
         const newItem = {
             id: uuid(),
-            name: "未命名大項",
+            // V22 修正: 預設為空字串，方便使用者直接輸入
+            name: "", 
             specMain: "",
             unit: "式",
             qty: 1,
@@ -1311,7 +1327,6 @@ function ExportButton() {
             return;
         }
 
-        // 🎯 V21 修正點 2: 處理 activeQuote.company 可能為空的情況
         const companyKey = activeQuote.company || 'herhsin'; 
         const quoteData = COMPANY_DATA[companyKey];
 
@@ -1323,7 +1338,7 @@ function ExportButton() {
             // 主項
             tableData.push([
                 index++,
-                item.name,
+                item.name || "未命名",
                 item.specMain,
                 item.unit,
                 item.qty,
@@ -1335,11 +1350,11 @@ function ExportButton() {
 
             // 子項
             (item.subItems || []).forEach(sub => {
-                // 只導出金額計算的子項目
+                // 只有 'item' 類型的子項目才計入金額，並導出到 Excel
                 if (sub.type === 'item') {
                     tableData.push([
                         "", // 留空索引
-                        `--- ${sub.name}`, 
+                        `--- ${sub.name || "子項目"}`, 
                         sub.specMain,
                         sub.unit,
                         sub.qty,
@@ -1347,6 +1362,28 @@ function ExportButton() {
                         calcAmount(sub),
                         sub.remarks,
                         sub.specMaterial
+                    ]);
+                }
+                
+                // 'text' 類型的子項目，作為備註行導出
+                if (sub.type === 'text') {
+                     tableData.push([
+                        "", 
+                        `**補充文字: ${sub.name || "無標題"}**`, 
+                        sub.remarks, // 內容放在規格欄位
+                        "", "", "", 0, // 其他欄位為空/0
+                        "", "" 
+                    ]);
+                }
+                
+                 // 'image' 類型的子項目，作為備註行導出
+                if (sub.type === 'image' && sub.imageUrl) {
+                     tableData.push([
+                        "", 
+                        `**補充圖片: ${sub.name || "無標題"}**`, 
+                        sub.imageUrl, // URL 放在規格欄位
+                        "", "", "", 0, 
+                        "", "" 
                     ]);
                 }
             });
@@ -1366,7 +1403,7 @@ function ExportButton() {
             ['客戶名稱:', activeQuote.customerName, '聯絡人:', activeQuote.contact, '電話:', activeQuote.phone],
             ['工程地點:', activeQuote.location],
             [],
-            ['項次', '品名', '規格/主描述', '單位', '數量', '單價', '金額(小計)', '備註', '用料明細'],
+            ['項次', '品名', '規格/用料明細/補充內容', '單位', '數量', '單價', '金額(小計)', '備註(規格品)', '用料明細(規格品)'],
         ];
 
         const footer = [
@@ -1392,13 +1429,13 @@ function ExportButton() {
         const wscols = [
             { wch: 6 }, // 項次
             { wch: 30 }, // 品名
-            { wch: 25 }, // 規格/主描述
+            { wch: 40 }, // 規格/用料明細/補充內容 (加寬)
             { wch: 6 }, // 單位
             { wch: 8 }, // 數量
             { wch: 15 }, // 單價
             { wch: 15 }, // 金額(小計)
-            { wch: 25 }, // 備註
-            { wch: 30 }, // 用料明細
+            { wch: 25 }, // 備註(規格品)
+            { wch: 30 }, // 用料明細(規格品)
         ];
         ws['!cols'] = wscols;
 
@@ -1443,7 +1480,8 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     const handlePrint = () => {
         
         if (!isReactDOMServerAvailable) {
-            alert('列印失敗：ReactDOMServer 模組尚未準備好。請稍候再試或檢查網頁是否載入完整。');
+            // V22 修正: 檢查是否是因為載入錯誤 (例如 404)
+            alert('列印失敗：ReactDOMServer 模組尚未準備好。請檢查網路連線或稍候再試。');
             return;
         }
         
@@ -1455,7 +1493,7 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
         const printArea = document.getElementById('quotePreviewArea');
         
         if (!printArea) {
-            alert('列印失敗：報價單預覽尚未載入。請稍候幾秒再試一次。');
+            alert('列印失敗：報價單預覽區域 (quotePreviewArea) 尚未載入。請稍候幾秒再試一次。');
             return;
         }
 
@@ -1468,7 +1506,6 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
         });
         
         // 使用靜態渲染生成 HTML 字串
-        // 這裡如果失敗，代表 ReactDOMServer 內部引用 React 核心失敗
         let htmlContent;
         try {
              htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
@@ -1509,15 +1546,13 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
 // --------------------------------------------------
 function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
     
-    // 🎯 V21 關鍵修正 3: 防禦性檢查，防止在 quote 不存在時程式崩潰
+    // 防禦性檢查
     if (!quote || !quote.company || !COMPANY_DATA[quote.company]) {
-        // 如果是編輯模式的預覽，顯示提示
         if (isPreview) {
             return <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
                 請選擇或新增報價單以顯示預覽
             </div>;
         }
-        // 如果是列印模式，回傳空內容防止崩潰
         return null; 
     }
 
@@ -1546,7 +1581,6 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
     // --------------------------------------------------
     const TotalSummary = () => {
         // 判斷是否有折扣或自定義價格
-        // 只有 discountPercent > 0 或 negotiatedPrice > 0 時，才視為有折扣
         const hasDiscount = Number(quote.discountPercent) > 0 || Number(quote.negotiatedPrice) > 0;
         
         // 總計金額 (原始總價)
@@ -1569,7 +1603,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                             </td>
                         </tr>
                         
-                        {/* 最終報價金額 (V20 關鍵修正: 有折扣或議價時才顯示) */}
+                        {/* 最終報價金額 (有折扣或議價時才顯示) */}
                         {hasDiscount && (
                             <tr>
                                 <td style={{ ...TH_TD_STYLE, width: '60%', textAlign: 'right', fontWeight: 'bold', border: 'none' }}>
@@ -1609,7 +1643,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                 
                 {/* 品名 */}
                 <td style={TH_TD_STYLE}>
-                    {item.name}
+                    {item.name || "未命名"}
                 </td>
                 
                 {/* 規格/用料明細 */}
@@ -1654,24 +1688,16 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                     // 補充文字
                     rows.push(
                         <tr key={sub.id + '-text'} className="sub-item-note">
-                            <td colSpan="8" style={{ ...TH_TD_STYLE, padding: '2px 6px', borderLeft: 'none', borderRight: 'none', fontStyle: 'italic', color: '#333' }}>
-                                <strong>{sub.name}:</strong> <pre style={{ display: 'inline', whiteSpace: 'pre-wrap' }}>{sub.remarks}</pre>
-                            </td>
+                            {/* V22: 刪除 tr 內部的換行，解決 DOM 嵌套警告 */}
+                            <td colSpan="8" style={{ ...TH_TD_STYLE, padding: '2px 6px', borderLeft: 'none', borderRight: 'none', fontStyle: 'italic', color: '#333' }}><strong>{sub.name || "補充文字"}:</strong> <pre style={{ display: 'inline', whiteSpace: 'pre-wrap', margin: '0' }}>{sub.remarks}</pre></td>
                         </tr>
                     );
-                } else if (sub.type === 'image') {
+                } else if (sub.type === 'image' && sub.imageUrl) {
                     // 補充圖片
                     rows.push(
                         <tr key={sub.id + '-image'} className="sub-item-note">
-                             <td colSpan="8" style={{ ...TH_TD_STYLE, padding: '2px 6px', borderLeft: 'none', borderRight: 'none', textAlign: 'center' }}>
-                                <strong>{sub.name}:</strong>
-                                <img 
-                                    src={sub.name} 
-                                    alt="補充圖片" 
-                                    className="print-image" 
-                                    style={{ maxWidth: '400px', height: 'auto', margin: '5px auto', display: 'block' }}
-                                />
-                            </td>
+                             {/* V22: 刪除 tr 內部的換行，解決 DOM 嵌套警告 */}
+                             <td colSpan="8" style={{ ...TH_TD_STYLE, padding: '2px 6px', borderLeft: 'none', borderRight: 'none', textAlign: 'center' }}><strong>{sub.name || "補充圖片"}:</strong><img src={sub.imageUrl} alt="補充圖片" className="print-image" style={{ maxWidth: '400px', height: 'auto', margin: '5px auto', display: 'block' }}/></td>
                         </tr>
                     );
                 }
@@ -1746,19 +1772,16 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {quote.items.map((item, index) => renderPrintItem(item, index + 1))}
-                    
-                    {/* 總計行 */}
-                    <tr className="total-row">
+                    {/* V22: 刪除 tbody 內部的換行，解決 DOM 嵌套警告 */}
+                    {quote.items.map((item, index) => renderPrintItem(item, index + 1))}<tr>
                         <td colSpan="6" style={{ ...TH_TD_STYLE, textAlign: 'right', fontWeight: 'bold' }}>
                             總計金額 (未稅):
                         </td>
                         <td style={{ ...TD_ALIGN_RIGHT_STYLE, fontWeight: 'bold', fontSize: '14px', color: 'blue' }}>
                             {formatMoney(totalAmount)}
                         </td>
-                        <td style={TH_TD_STYLE}></td> {/* 備註列留空 */}
+                        <td style={TH_TD_STYLE}></td>
                     </tr>
-                    
                 </tbody>
             </table>
             
@@ -1800,7 +1823,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                             </tr>
                             <tr style={{ height: '70px' }}>
                                 <td style={TH_TD_STYLE}>
-                                    {/* 假設公司印章圖片URL */}
+                                    {/* 顯示預設的印章圖 (或替換成有效的 URL) */}
                                     <img 
                                         src={companyInfo.stamp} 
                                         alt="公司印章" 
@@ -1853,7 +1876,6 @@ function App() {
 }
 
 // P6 — 啟動應用程式
-// 🎯 V21 警告處理: 雖然 React 18 建議使用 createRoot，但在單一 HTML 檔案中使用 Babel 轉譯器，render 是最簡單可靠的方式。
 ReactDOM.render(
     <AppProvider>
         <App />
