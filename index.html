@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）</title>
+    <title>工程報價系統（Herhsin & SinChang）- V8</title>
 
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
@@ -48,7 +48,7 @@
             min-height: 297mm; /* 確保至少一頁高度 */
         }
         
-        /* 標題 - 🎯 修正：公司名稱置中 */
+        /* 標題 - 公司名稱置中 */
         .print-header h1 {
             font-size: 24px;
             font-weight: bold;
@@ -75,7 +75,6 @@
         }
 
         /* 報價項目表格 */
-        /* 🎯 修正: 強化邊框線條 */
         table.print-items-table {
             border-collapse: collapse;
             width: 100%;
@@ -152,15 +151,15 @@
 <script type="text/babel">
 // P1 — 公司資料 / 付款條件 / 備註 / 模式模板
 const COMPANY_DATA = {
-    // 🎯 修正 2：統一公司地址為鳳屏二路 383-8 號
+    // 公司地址
     herhsin: {
         name: "何鑫實業股份有限公司",
         tel: "07-6517476",
         fax: "07-6517994",
         email: "admin@herhsin.com",
         address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "herhsin_stamp_placeholder.png", // 佔位符
-        prefix: "QH" // 何鑫報價單編號前綴
+        stamp: "herhsin_stamp_placeholder.png", 
+        prefix: "QH" 
     },
     sinchang: {
         name: "薪昌有限公司",
@@ -168,8 +167,8 @@ const COMPANY_DATA = {
         fax: "07-6517994",
         email: "affairs@herhsin.com",
         address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "sinchang_stamp_placeholder.png", // 佔位符
-        prefix: "QS" // 薪昌報價單編號前綴
+        stamp: "sinchang_stamp_placeholder.png", 
+        prefix: "QS" 
     }
 };
 
@@ -178,7 +177,7 @@ const DEFAULT_NOTES = `1. 本報價未含加值稅。
 2. 安裝施作時需注意現場作業環境。
 3. 報價單有效期限為 15 天。
 4. 若遇不可抗力因素造成延誤，工期順延。
-5. 料件須由本公司提供與安裝，否6.則不在保固範圍內。
+5. 料件須由本公司提供與安裝，否則不在保固範圍內。
 6. 付款條件依雙方合約內容為準。`;
 
 // 預設付款條件
@@ -251,7 +250,7 @@ function calcTotal(items) {
         let subs = 0;
 
         if (it.subItems && it.subItems.length > 0) {
-            // 計算所有 subItem 的金額，包括 item 類型
+            // 計算所有 item 類型的 subItem 的金額
             subs = it.subItems.reduce((s, sub) => (sub.type === 'item' ? s + calcAmount(sub) : s), 0);
         }
 
@@ -273,7 +272,7 @@ function calcNegotiated(total, discountPercent, customPrice) {
 
 // 報價單編號
 function generateQuoteNo(companyKey) {
-    const prefix = COMPANY_DATA[companyKey]?.prefix || "Q"; // 使用公司前綴，否則預設 Q
+    const prefix = COMPANY_DATA[companyKey]?.prefix || "Q"; 
     
     // 使用 YYYYMMDDHHMM + 4位亂數
     const d = new Date();
@@ -287,7 +286,7 @@ function generateQuoteNo(companyKey) {
     
     const random = Math.floor(1000 + Math.random() * 9000);
     
-    return `${prefix}${parts}-${random}`; // 將前綴納入
+    return `${prefix}${parts}-${random}`; 
 }
 
 // 載入 Google Sheet CSV (非同步函式)
@@ -342,10 +341,9 @@ function AppProvider({ children }) {
     const [specItems, setSpecItems] = React.useState([]);
 
     // Google Sheet 路徑 (請務必將此替換為您的公開 CSV 連結)
-    // ⚠️ 提醒：請確保這個連結是您最新的公開 CSV 連結
     const SPEC_CSV_URL =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv"; 
-        // ^^^^^^ 請確保這是您最新的公開 CSV 連結 ^^^^^^
+        
 
     //************* 初始化：從 localStorage 載入 *************/
     React.useEffect(() => {
@@ -395,21 +393,21 @@ function AppProvider({ children }) {
         // 在建立報價單時，根據當前選定的 company 產生編號
         const newQuote = {
             id: uuid(),
-            quoteNo: generateQuoteNo(company), // 傳入 company key
+            quoteNo: generateQuoteNo(company), 
             title: mode ? mode.name : "未命名工程",
             customerName: "",
             contact: "",
             phone: "",
             location: "",
-            date: formatDate(), // 使用修正後的格式化函數
+            date: formatDate(), 
             items: mode && Array.isArray(mode.defaultItems) ? mode.defaultItems.map(item => ({
                 ...item, 
                 id: uuid(), 
                 subItems: [],
-                // 🎯 修正：新增 specMain (主規格), specMaterial (用料), remarks (備註)
-                specMain: "", 
-                specMaterial: "", 
-                remarks: ""
+                // 項目規格欄位
+                specMain: "", // 規格 (主描述)
+                specMaterial: "", // 用料明細 (用料1/2/3 合併)
+                remarks: "" // 備註
             })) : [],
             notes: mode ? mode.defaultNotes : DEFAULT_NOTES,
             payment: mode ? mode.defaultPayment : DEFAULT_PAYMENT,
@@ -456,7 +454,7 @@ function AppProvider({ children }) {
             ...item, 
             id: uuid(), 
             subItems: [],
-            // 🎯 修正：新增 specMain (主規格), specMaterial (用料), remarks (備註)
+            // 初始化規格欄位
             specMain: "", 
             specMaterial: "", 
             remarks: ""
@@ -464,7 +462,7 @@ function AppProvider({ children }) {
 
         updateQuote(activeQuoteId, {
             title: mode.name,
-            items: itemsWithIds, // 使用帶有 ID 的項目
+            items: itemsWithIds, 
             notes: mode.defaultNotes,
             payment: mode.defaultPayment,
         });
@@ -482,12 +480,12 @@ function AppProvider({ children }) {
         createQuote,
         deleteQuote,
         updateQuote,
-        activeQuote, // 直接提供當前報價單物件
+        activeQuote, 
         activeQuoteId,
         setActiveQuoteId,
 
         specItems,
-        loadSpecItems, // 提供手動載入規格品函式
+        loadSpecItems, 
         applyMode
     };
 
@@ -542,7 +540,7 @@ function CompanySelector() {
 
 
 // --------------------------------------------------
-// 報價模式選擇器（A 維修、B 搶修、C 拌合機漏漿…）
+// 報價模式選擇器
 // --------------------------------------------------
 function ModeSelector() {
     const { createQuote } = React.useContext(AppContext);
@@ -577,7 +575,7 @@ function ModeSelector() {
 
 
 // --------------------------------------------------
-// 報價單管理：列表、切換、刪除 (修正版)
+// 報價單管理：列表、切換、刪除
 // --------------------------------------------------
 function QuoteManager() {
     const {
@@ -585,14 +583,13 @@ function QuoteManager() {
         activeQuoteId,
         setActiveQuoteId,
         deleteQuote,
-        createQuote, // 使用 createQuote 替換 addQuote
+        createQuote, 
     } = React.useContext(AppContext);
 
-    // 根據 ID 排序，讓最新的排在最上面
+    // 根據日期排序，讓最新的排在最上面
     const sortedQuotes = React.useMemo(() => {
-        // 確保 quotes 是陣列且包含有效的 id
         return [...(quotes || [])].sort((a, b) => {
-            if (!a.id || !b.id) return 0;
+            if (!a.date || !b.date) return 0;
             // 根據日期排序，最新日期排前面
             if (a.date > b.date) return -1;
             if (a.date < b.date) return 1;
@@ -608,20 +605,20 @@ function QuoteManager() {
             {/* 新增報價單按鈕 (導向建立空白報價單) */}
             <button
                 className="w-full px-3 py-2 bg-purple-600 text-white rounded mb-4 hover:bg-purple-700 transition"
-                onClick={() => createQuote(null)} // 建立空白報價單
+                onClick={() => createQuote(null)} 
             >
                 ＋ 建立新報價單
             </button>
 
             <div className="max-h-80 overflow-y-auto">
-            {sortedQuotes.length === 0 && ( // 使用 sortedQuotes
+            {sortedQuotes.length === 0 && ( 
                 <div className="text-gray-500 text-sm text-center">
                     尚無資料，請先建立報價單
                 </div>
             )}
 
             <div className="flex flex-col gap-1">
-                {sortedQuotes.map(q => ( // 使用 sortedQuotes
+                {sortedQuotes.map(q => ( 
                     <div
                         key={q.id}
                         className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer transition
@@ -668,26 +665,23 @@ function QuoteManager() {
 function QuoteEditor() {
     const {
         company,
-        activeQuote, // 直接取用 activeQuote
+        activeQuote, 
         updateQuote
     } = React.useContext(AppContext);
 
     const quote = activeQuote;
 
     // -------------------------------
-    // 更新欄位 (Hooks 必須放在頂層)
+    // 更新欄位
     // -------------------------------
     const update = React.useCallback((field, value) => {
-        // 確保 quote 存在再呼叫 updateQuote
         if (quote) {
             updateQuote(quote.id, { [field]: value });
         }
-    }, [quote, updateQuote]); // 依賴項改為 quote 物件
+    }, [quote, updateQuote]); 
 
-    // 如果 quote 不存在，提早返回 (放在所有 Hooks 之後)
     if (!quote) return null;
 
-    // 引用 P1 的全局數據
     const info = COMPANY_DATA[company];
 
     return (
@@ -766,7 +760,6 @@ function QuoteEditor() {
                     <input
                         type="date"
                         className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
-                        // date 欄位使用 yyyy-mm-dd 格式
                         value={quote.date || formatDate()}
                         onChange={(e) => update("date", e.target.value)}
                     />
@@ -812,14 +805,14 @@ function NoteSubItemBlock({ sub, updateField, deleteSubItem }) {
 // P4-3（X）SpecItemSuggest — 規格品自動建議元件
 function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
     
-    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
+    // 規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
     const FIELD_MATERIAL_3 = '用料3'; 
-    const FIELD_REMARKS = '備註';
+    const FIELD_REMARKS = '備註'; // 備註欄位
 
-    // 搜尋結果，移除 5 個的限制
+    // 搜尋結果
     const filteredItems = React.useMemo(() => {
         const input = (currentInput || "").toLowerCase().trim();
 
@@ -850,7 +843,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
                 <div
                     key={index}
                     className="p-2 cursor-pointer hover:bg-blue-100 text-sm border-b last:border-b-0"
-                    onMouseDown={(e) => { // 使用 onMouseDown 而不是 onClick/onMouseUp 來確保在 onBlur 之前觸發
+                    onMouseDown={(e) => { 
                         e.preventDefault(); // 防止 input 失去焦點
                         handleSelect(item); 
                     }}
@@ -869,22 +862,21 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
 
 // P4-3（B）ItemSubItemBlock — 子項目（含數量/單價）
 function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
-    const { specItems } = React.useContext(AppContext); // 取得規格品列表
+    const { specItems } = React.useContext(AppContext); 
     
-    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
+    // 規格品欄位結構
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
     const FIELD_MATERIAL_3 = '用料3'; 
     const FIELD_REMARKS = '備註';
 
-    // 新增狀態來控制建議列表的顯示/隱藏
     const [showSuggest, setShowSuggest] = React.useState(false); 
 
     // 計算並格式化小計
     const subtotal = formatMoney(calcAmount(sub));
 
-    // 處理數字輸入 (Hooks 必須放在頂層)
+    // 處理數字輸入
     const handleNumberChange = React.useCallback((field, value) => {
         // 只允許數字或空字串
         if (value === "" || !isNaN(Number(value))) {
@@ -892,31 +884,30 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
         }
     }, [updateField]);
     
-    // 🎯 處理規格品選擇
+    // 處理規格品選擇
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 🎯 關鍵修正 3：確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
             spec[FIELD_MATERIAL_3] || ''
-        ].filter(p => p.trim() !== ''); // 過濾空字串和純空白
+        ].filter(p => p.trim() !== ''); 
 
-        const materialSpec = materialParts.join(' / ').trim(); // 使用 / 分隔
+        const materialSpec = materialParts.join(' / ').trim(); 
 
         // 從規格品數據自動填入規格、單位、單價
         updateField("name", spec['品名'] || sub.name);
         
-        // 🎯 修正：將資料拆分到新欄位
+        // 🎯 關鍵修正 1: 資料拆分精確對應欄位
         updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格
-        updateField("specMaterial", materialSpec); // 用料 1 2 3 合併
-        updateField("remarks", spec[FIELD_REMARKS] || ""); // 備註
+        updateField("specMaterial", materialSpec); // 用料 1 2 3 合併 (用於顯示)
+        updateField("remarks", spec[FIELD_REMARKS] || ""); // 備註 (回歸備註欄)
         
         updateField("unit", spec['單位'] || sub.unit);
-        // 關鍵修正: 確保單價 price 被填入
         updateField("price", spec['單價'] || ""); 
         setShowSuggest(false); // 選完後隱藏列表
-    }, [updateField, sub.name, sub.unit]);
+    }, [updateField, sub.name, sub.unit, FIELD_MAIN_SPEC, FIELD_MATERIAL_1, FIELD_MATERIAL_2, FIELD_MATERIAL_3, FIELD_REMARKS]);
 
     return (
         <div className="border rounded p-3 bg-gray-50 mb-2">
@@ -930,8 +921,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                 
             </div>
 
-            {/* 🎯 修正：編輯器欄位排版 */}
-            {/* 3 (名稱) | 2 (規格) | 1 (單位) | 1 (數量) | 1 (單價) | 2 (備註) | 1 (小計) | (Delete button is separate) */}
+            {/* 編輯器欄位排版 */}
             <div className="grid grid-cols-12 gap-2 text-sm items-center relative">
 
                 {/* 名稱 (col-span-3) - **使用 SpecItemSuggest** */}
@@ -942,10 +932,10 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                         placeholder="名稱"
                         onChange={(e) => {
                             updateField("name", e.target.value);
-                            setShowSuggest(true); // 輸入時顯示建議
+                            setShowSuggest(true); 
                         }}
-                        onBlur={() => setTimeout(() => setShowSuggest(false), 200)} // 失去焦點時隱藏
-                        onFocus={() => (sub.name || "").length >= 1 && setShowSuggest(true)} // 取得焦點時顯示
+                        onBlur={() => setTimeout(() => setShowSuggest(false), 200)} 
+                        onFocus={() => (sub.name || "").length >= 1 && setShowSuggest(true)} 
                     />
                     
                     {/* 只有在 showSuggest 為 true 且輸入字數滿足條件時才渲染 */}
@@ -954,14 +944,14 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                             currentInput={sub.name} 
                             specItems={specItems} 
                             onSelect={handleSelectSpecItem}
-                            onHide={() => setShowSuggest(false)} // 傳遞隱藏函式
+                            onHide={() => setShowSuggest(false)} 
                         />
                     )}
                 </div>
 
-                {/* 規格 (col-span-2) - 🎯 修正：名稱改為 '規格' */}
+                {/* 規格 (col-span-2) */}
                 <input
-                    className="border p-1 rounded col-span-2 focus:ring focus:ring-blue-100" // 寬度改為 col-span-2
+                    className="border p-1 rounded col-span-2 focus:ring focus:ring-blue-100" 
                     value={sub.specMain || ""}
                     placeholder="規格 (主描述)"
                     onChange={(e) => updateField("specMain", e.target.value)}
@@ -987,7 +977,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
 
                 {/* 單價 (col-span-1) */}
                 <input
-                    className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-blue-100" // 寬度改為 col-span-1
+                    className="border p-1 rounded col-span-1 text-right focus:ring focus:ring-blue-100" 
                     value={sub.price || ""}
                     placeholder="單價"
                     type="number"
@@ -1009,10 +999,10 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                 </div>
             </div>
 
-            {/* 🎯 修正：新增 用料明細 顯示 */}
+            {/* 🎯 關鍵修正 1：用料明細專屬顯示區 */}
             {(sub.specMaterial || "").length > 0 && (
-                <div className="mt-1 ml-4 text-xs text-gray-500 italic">
-                    用料明細: {sub.specMaterial}
+                <div className="mt-1 ml-4 text-xs text-gray-500 italic border-t pt-1">
+                    **用料明細**: {sub.specMaterial}
                 </div>
             )}
         </div>
@@ -1022,7 +1012,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
 
 // P4-3（C）ImageSubItemBlock — 圖片小項
 function ImageSubItemBlock({ sub, updateField, deleteSubItem }) {
-    // 圖片上傳處理 (不是 Hook，不需要提升)
+    // 圖片上傳處理
     function handleUpload(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -1060,7 +1050,7 @@ function ImageSubItemBlock({ sub, updateField, deleteSubItem }) {
 
 // P4-3（D）UploadImageButton — 在底部新增圖片用
 function UploadImageButton({ onUpload }) {
-    // 圖片上傳處理 (不是 Hook，不需要提升)
+    // 圖片上傳處理 
     function handleSelect(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -1083,7 +1073,7 @@ function UploadImageButton({ onUpload }) {
 // P4-3（E）SubItemWrapper — 自動分流小項類型
 function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 
-    // 更新某個 subItem 的特定欄位 (Hooks 必須放在頂層)
+    // 更新某個 subItem 的特定欄位 
     const updateField = React.useCallback((field, value) => {
         const newItems = quote.items.map(m =>
             m.id === parentItem.id
@@ -1099,7 +1089,7 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
         updateQuote(quote.id, { items: newItems });
     }, [quote.id, parentItem.id, subItem.id, quote.items, updateQuote]);
 
-    // 刪除 subItem (Hooks 必須放在頂層)
+    // 刪除 subItem 
     const deleteSubItem = React.useCallback(() => {
         const newItems = quote.items.map(m =>
             m.id === parentItem.id
@@ -1119,11 +1109,11 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 }
 
 
-// P4-3（F）MainItemBlock — 大項編輯 (關鍵修正: 確保單價連動)
+// P4-3（F）MainItemBlock — 大項編輯 
 function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index 屬性
     const { specItems } = React.useContext(AppContext);
     
-    // 🎯 修正：規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
+    // 規格品欄位結構
     const FIELD_MAIN_SPEC = '規格'; 
     const FIELD_MATERIAL_1 = '用料1'; 
     const FIELD_MATERIAL_2 = '用料2'; 
@@ -1132,7 +1122,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
     
     const [showSuggest, setShowSuggest] = React.useState(false); 
 
-    // 1. 更新大項資料 (Hooks 必須放在頂層)
+    // 1. 更新大項資料 
     const update = React.useCallback((data) => {
         const newItems = quote.items.map(m =>
             m.id === item.id ? { ...m, ...data } : m
@@ -1140,27 +1130,27 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
         updateQuote(quote.id, { items: newItems });
     }, [quote.id, item.id, quote.items, updateQuote]);
 
-    // 2. 處理數字輸入 (Hooks 必須放在頂層)
+    // 2. 處理數字輸入 
     const handleNumberChange = React.useCallback((field, value) => {
         if (value === "" || !isNaN(Number(value))) {
             update({ [field]: value });
         }
     }, [update]);
 
-    // 3. 刪除大項 (Hooks 必須放在頂層)
+    // 3. 刪除大項 
     const deleteMain = React.useCallback(() => {
         if (!confirm("確定要刪除此大項？")) return;
         updateQuote(quote.id, { items: quote.items.filter(m => m.id !== item.id) });
     }, [quote.id, item.id, quote.items, updateQuote]);
 
-    // 4. 新增小項 (Hooks 必須放在頂層)
+    // 4. 新增小項 
     const addSub = React.useCallback((type, src = "") => {
         const newSub = {
             id: uuid(),
             type,
             text: "",
             name: "",
-            // 🎯 修正：子項目也新增欄位
+            // 子項目規格欄位
             specMain: "", 
             specMaterial: "",
             remarks: "",
@@ -1180,24 +1170,23 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
     // 🎯 處理規格品選擇
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 🎯 關鍵修正 3：確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
             spec[FIELD_MATERIAL_3] || ''
-        ].filter(p => p.trim() !== ''); // 過濾空字串和純空白
+        ].filter(p => p.trim() !== ''); 
 
-        const materialSpec = materialParts.join(' / ').trim(); // 使用 / 分隔
+        const materialSpec = materialParts.join(' / ').trim(); 
 
         // 從規格品數據自動填入規格、單位、單價
         update({
             name: spec['品名'] || item.name,
-            // 🎯 修正：將資料拆分到新欄位
-            specMain: spec[FIELD_MAIN_SPEC] || "", 
-            specMaterial: materialSpec, 
-            remarks: spec[FIELD_REMARKS] || "",
+            // 🎯 關鍵修正 1: 資料拆分精確對應欄位
+            specMain: spec[FIELD_MAIN_SPEC] || "", // 主規格
+            specMaterial: materialSpec, // 用料 1 2 3 合併 (用於顯示)
+            remarks: spec[FIELD_REMARKS] || "", // 備註 (回歸備註欄)
             unit: spec['單位'] || item.unit,
-            // 關鍵修正: 確保 price 被填入
             price: spec['單價'] || "", 
         });
         setShowSuggest(false);
@@ -1218,7 +1207,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                 <div className="col-span-1 text-center">單位</div>
                 <div className="col-span-1 text-right">數量</div>
                 <div className="col-span-1 text-right">單價</div> 
-                <div className="col-span-2 text-left">備註</div> {/* NEW */}
+                <div className="col-span-2 text-left">備註</div> 
                 <div className="col-span-1 text-right">小計</div> 
                 <div className="col-span-1"></div>
             </div>
@@ -1253,7 +1242,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                         />
                     )}
                 </div>
-                {/* 規格 (col-span-2) - 🎯 修正：使用 item.specMain */}
+                {/* 規格 (col-span-2) - 使用 item.specMain */}
                 <input className="border p-1 rounded col-span-2 focus:ring focus:ring-red-100 text-left"
                     value={item.specMain || ""} placeholder="規格 (主描述)"
                     onChange={(e) => update({ specMain: e.target.value })} />
@@ -1272,7 +1261,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                     type="number" min="0"
                     onChange={(e) => handleNumberChange("price", e.target.value)} />
                 
-                {/* 備註 (col-span-2) - NEW */}
+                {/* 備註 (col-span-2) - 🎯 關鍵修正 1: 使用 item.remarks */}
                 <input className="border p-1 rounded col-span-2 focus:ring focus:ring-red-100 text-left"
                     value={item.remarks || ""} placeholder="備註"
                     onChange={(e) => update({ remarks: e.target.value })} />
@@ -1287,10 +1276,10 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                 </button>
             </div>
             
-            {/* 🎯 修正：新增 用料明細 顯示 */}
+            {/* 🎯 關鍵修正 1：用料明細專屬顯示區 */}
             {(item.specMaterial || "").length > 0 && (
                 <div className="mt-1 ml-4 text-xs text-gray-500 italic border-t pt-1">
-                    用料明細: {item.specMaterial}
+                    **用料明細**: {item.specMaterial}
                 </div>
             )}
 
@@ -1318,13 +1307,13 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
 }
 // P4-3（G）ItemsEditor — 整體品項管理
 function ItemsEditor({ quote, updateQuote }) {
-    // 1. 新增大項 (Hooks 必須放在頂層)
+    // 1. 新增大項 
     const addMain = React.useCallback(() => {
         const newMain = {
             id: uuid(),
             type: "main",
-            name: "", // 預設為空字串
-            // 🎯 修正：初始化新欄位
+            name: "", 
+            // 初始化規格欄位
             specMain: "", 
             specMaterial: "",
             remarks: "",
@@ -1409,7 +1398,7 @@ function PriceSummary({ quote, update }) {
     // 計算議定後價格
     const negotiated = calcNegotiated(total, quote.discountPercent, quote.negotiatedPrice);
 
-    // 處理數字輸入 (Hooks 必須放在頂層)
+    // 處理數字輸入
     const handleNumberChange = React.useCallback((field, value) => {
         if (value === "" || !isNaN(Number(value))) {
             update(quote.id, { [field]: value });
@@ -1478,7 +1467,6 @@ function exportToExcel(quote, companyInfo) {
     const negotiated = calcNegotiated(total, quote.discountPercent, quote.negotiatedPrice);
 
     // Excel 表頭
-    // 🎯 修正：新增規格 (主描述)、用料明細、備註
     const header = [
         "項次", "品名", "規格 (主描述)", "用料明細", "單位", "數量", "單價", "金額", "備註" 
     ];
@@ -1515,11 +1503,11 @@ function exportToExcel(quote, companyInfo) {
                     sub.remarks || "" // 備註
                 ]);
             } else if (sub.type === 'note' && sub.text) {
-                // 🎯 修正：調整 note 的欄位數量為 9
+                // 調整 note 的欄位數量為 9
                 data.push([
                     "",
                     `備註：${sub.text}`, 
-                    "", "", "", "", "", "", "", // Fill columns 3-8 (total 9 columns)
+                    "", "", "", "", "", "", "", 
                 ]);
             }
         });
@@ -1539,7 +1527,7 @@ function exportToExcel(quote, companyInfo) {
         header, // 項目表格表頭
         ...data, // 項目表格內容
         [],
-        ["總金額 (未稅)", "", "", "", "", "", "", total], // 調整總計欄位
+        ["總金額 (未稅)", "", "", "", "", "", "", total], 
         ["折扣 (%)", quote.discountPercent || 0, "", "議定價格 (未稅)", negotiated],
         ["最終報價 (未稅)", negotiated],
         [],
@@ -1550,7 +1538,6 @@ function exportToExcel(quote, companyInfo) {
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
     // --- 設置欄位寬度 (可選) ---
-    // 🎯 修正：調整欄位寬度以適應 9 個欄位
     const wscols = [
         { wch: 6 }, { wch: 30 }, { wch: 20 }, { wch: 30 }, { wch: 8 }, 
         { wch: 8 }, { wch: 12 }, { wch: 15 }, { wch: 15 } // 9 columns
@@ -1610,9 +1597,19 @@ function PrintButton() {
             return;
         }
         
-        // 🎯 修正: 由於 ReactDOMServer 已在 HTML 頂部優先載入，
-        // 這裡只需要直接呼叫 window.print() 即可
-        // 因為 PrintLayout 已經被靜態渲染到 #quotePreviewArea
+        const previewArea = document.getElementById('quotePreviewArea');
+        // 🎯 關鍵修正 2: 檢查預覽區是否已被靜態渲染，防止空白列印
+        if (!previewArea || previewArea.innerHTML.includes('PrintLayout Component')) {
+             alert("報價單預覽尚未載入完成，請稍候幾秒再試一次。");
+             // 可以選擇在這邊再次嘗試渲染 (非同步)
+             if (typeof ReactDOMServer !== 'undefined' && typeof ReactDOMServer.renderToString === 'function') {
+                const html = ReactDOMServer.renderToString(<PrintLayout quote={activeQuote} />);
+                previewArea.innerHTML = html;
+                setTimeout(() => window.print(), 100); // 延遲列印
+             }
+             return;
+        }
+        
         window.print();
         
     }, [activeQuote]);
@@ -1634,12 +1631,11 @@ function PrintItemRow({ item, index, isSub = false }) {
     
     const amount = calcAmount(item);
     
-    // 🎯 修正：Note/Image 子項的 colSpan 必須是 7
+    // 處理 Note/Image 子項
     if (item.type === 'note' && item.text) {
         // 補充文字
         return (
             <tr className="page-break-inside-avoid">
-                {/* 使用 colSpan="7" 涵蓋所有欄位 */}
                 <td colSpan="7" style={{ borderTop: 'none', padding: '0 6px 4px 6px', fontWeight: 'normal', color: '#333' }}>
                     <span style={{ fontWeight: 'bold' }}>補充說明:</span> <span style={{ whiteSpace: 'pre-wrap' }}>{item.text}</span>
                 </td>
@@ -1649,7 +1645,6 @@ function PrintItemRow({ item, index, isSub = false }) {
         // 圖片
         return (
             <tr className="page-break-inside-avoid">
-                {/* 使用 colSpan="7" 涵蓋所有欄位 */}
                 <td colSpan="7" style={{ borderTop: 'none', padding: '4px 6px 0 6px' }}>
                     <img src={item.src} alt="工程圖片" className="print-image" />
                 </td>
@@ -1660,42 +1655,47 @@ function PrintItemRow({ item, index, isSub = false }) {
     // 標準大項或子項目
     const namePrefix = isSub ? ' ↳ ' : '';
     
-    // 🎯 修正：品名、規格 (主描述)、用料明細
     const itemContent = item.name || '';
     const mainSpecContent = (item.specMain && item.specMain.trim() !== '') 
                             ? ` (${item.specMain})` : '';
+    // 🎯 關鍵修正 1: 用料明細專門用於子行顯示 (在下一行 tr 顯示)
     const materialSpecContent = (item.specMaterial && item.specMaterial.trim() !== '') 
                                 ? item.specMaterial : '';
     
     return (
         <React.Fragment>
+            {/* 主要行：品名, 規格, 單位, 數量, 單價, 備註, 金額 */}
             <tr className={!isSub ? "font-bold page-break-inside-avoid" : "page-break-inside-avoid"}>
                 <td style={{ width: '5%', textAlign: 'center' }}>{isSub ? '' : index}</td>
-                {/* 🎯 第二欄：合併 品名, 規格, 用料 */}
+                {/* 🎯 第二欄：只顯示 品名 + 規格 (主描述) */}
                 <td style={{ width: '45%' }}> 
-                    {/* 第一行：品名 + 規格 (主描述) */}
-                    <div>
-                        {namePrefix}{itemContent}{mainSpecContent}
-                    </div>
-                    {/* 第二行：用料明細 (僅在有內容時顯示) */}
-                    {materialSpecContent && (
-                        <div style={{ fontSize: '12px', fontWeight: 'normal', color: '#555', marginTop: '2px', paddingLeft: isSub ? '10px' : '0' }}>
-                            用料: {materialSpecContent} 
-                        </div>
-                    )}
+                    {namePrefix}{itemContent}{mainSpecContent}
                 </td>
                 
                 <td style={{ width: '8%', textAlign: 'center' }}>{item.unit || ''}</td>
                 <td style={{ width: '8%', textAlign: 'right' }}>{item.qty || ''}</td>
                 <td style={{ width: '10%', textAlign: 'right' }}>{formatMoney(item.price)}</td> 
                 
-                {/* 🎯 備註欄位 - NEW */}
+                {/* 🎯 備註欄位 - 顯示 item.remarks */}
                 <td style={{ width: '10%' }}>{item.remarks || ''}</td> 
 
                 <td style={{ width: '14%', textAlign: 'right' }}>{formatMoney(amount)}</td> 
             </tr>
             
-            {/* 遞歸處理子項目 */}
+            {/* 🎯 關鍵修正 1: 如果有用料明細，在下一行以子行方式顯示，並合併儲存格 */}
+            {materialSpecContent && (
+                <tr className="page-break-inside-avoid">
+                    <td style={{ borderTop: 'none' }}></td> {/* 項次留空 */}
+                    {/* 用料明細合併儲存格 (從第二欄到倒數第二欄，共 5 欄) */}
+                    <td colSpan="5" style={{ fontSize: '12px', fontWeight: 'normal', color: '#555', padding: '0 6px 4px 10px', borderTop: 'none' }}>
+                         **用料明細**: {materialSpecContent}
+                    </td>
+                    <td style={{ borderTop: 'none' }}></td> {/* 備註留空 */}
+                    <td style={{ borderTop: 'none' }}></td> {/* 金額留空 */}
+                </tr>
+            )}
+            
+            {/* 遞歸處理 item 類型的子項目 */}
             {!isSub && (item.subItems || []).filter(s => s.type === 'item').map((sub, subIndex) => (
                 <PrintItemRow key={sub.id} item={sub} index={subIndex} isSub={true} />
             ))}
@@ -1759,12 +1759,12 @@ const PrintLayout = ({ quote }) => {
                 <thead>
                     <tr>
                         <th style={{ width: '5%' }}>項次</th>
-                        {/* 🎯 修正：品名/規格/用料 欄位寬度調整 */}
-                        <th style={{ width: '45%' }}>品名/規格/用料</th> 
+                        {/* 🎯 第二欄包含品名/規格/用料 */}
+                        <th style={{ width: '45%' }}>品名 / 規格 (主描述)</th> 
                         <th style={{ width: '8%' }}>單位</th>
                         <th style={{ width: '8%' }}>數量</th>
                         <th style={{ width: '10%' }}>單價</th>
-                        {/* 🎯 修正：新增備註欄位 */}
+                        {/* 🎯 備註獨立一欄 */}
                         <th style={{ width: '10%' }}>備註</th>
                         <th style={{ width: '14%' }}>金額</th>
                     </tr>
@@ -1832,6 +1832,7 @@ function QuotePreview() {
         <div className="mt-8 border-t pt-4 bg-gray-100 p-6 no-print">
             <h2 className="text-xl font-bold mb-4 text-gray-700">📄 即時報價單預覽 (列印版面)</h2>
             <div id="previewContainer" className="bg-white shadow-xl p-8 max-w-4xl mx-auto border border-gray-300">
+                {/* 這裡用於即時預覽 */}
                 <PrintLayout quote={activeQuote} />
             </div>
         </div>
@@ -1843,17 +1844,23 @@ function QuotePreview() {
 function App() {
     const { activeQuote, updateQuote, activeQuoteId, loadSpecItems } = React.useContext(AppContext);
     
-    // 🎯 修正: 為了讓 ReactDOMServer.renderToString 在列印時能抓到最新的 activeQuote
-    // 我們需要將 PrintLayout 的內容靜態渲染到 #quotePreviewArea
-    // 這裡我們在每次 activeQuote 變動時更新靜態 HTML
+    // 🎯 關鍵修正 2: 靜態渲染 PrintLayout 到 #quotePreviewArea
     React.useEffect(() => {
-        if (activeQuote && typeof ReactDOMServer !== 'undefined' && typeof ReactDOMServer.renderToString === 'function') {
-            const html = ReactDOMServer.renderToString(<PrintLayout quote={activeQuote} />);
+        // 確保 activeQuote 存在
+        if (!activeQuote) return; 
+
+        // 確保 ReactDOMServer 已經載入
+        if (typeof window.ReactDOMServer !== 'undefined' && typeof window.ReactDOMServer.renderToString === 'function') {
+            const html = window.ReactDOMServer.renderToString(<PrintLayout quote={activeQuote} />);
             const previewArea = document.getElementById('quotePreviewArea');
             if (previewArea) {
-                previewArea.innerHTML = html;
+                // 將靜態 HTML 寫入，確保列印時是完整的報價單結構
+                previewArea.innerHTML = html; 
             }
+        } else {
+            console.warn("ReactDOMServer 尚未載入，無法預渲染列印內容。");
         }
+        
     }, [activeQuote]);
 
 
