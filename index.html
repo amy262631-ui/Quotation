@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- V8</title>
+    <title>工程報價系統（Herhsin & SinChang）- V9</title>
 
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
@@ -884,10 +884,10 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
         }
     }, [updateField]);
     
-    // 處理規格品選擇
+    // 🎯 處理規格品選擇 (修正備註/用料明細混淆問題)
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 🎯 修正點 1: 用料明細 - 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
@@ -899,10 +899,12 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
         // 從規格品數據自動填入規格、單位、單價
         updateField("name", spec['品名'] || sub.name);
         
-        // 🎯 關鍵修正 1: 資料拆分精確對應欄位
-        updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格
+        // 資料拆分精確對應欄位
+        updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格 (規格)
         updateField("specMaterial", materialSpec); // 用料 1 2 3 合併 (用於顯示)
-        updateField("remarks", spec[FIELD_REMARKS] || ""); // 備註 (回歸備註欄)
+        
+        // 🎯 修正點 2: 備註 - 確保使用規格品表格中的 '備註' 欄位
+        updateField("remarks", spec[FIELD_REMARKS] || ""); // 備註 (回歸報價單備註欄)
         
         updateField("unit", spec['單位'] || sub.unit);
         updateField("price", spec['單價'] || ""); 
@@ -999,7 +1001,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                 </div>
             </div>
 
-            {/* 🎯 關鍵修正 1：用料明細專屬顯示區 */}
+            {/* 🎯 用料明細專屬顯示區 */}
             {(sub.specMaterial || "").length > 0 && (
                 <div className="mt-1 ml-4 text-xs text-gray-500 italic border-t pt-1">
                     **用料明細**: {sub.specMaterial}
@@ -1167,10 +1169,10 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
         updateQuote(quote.id, { items: newItems });
     }, [quote.id, item.id, quote.items, updateQuote]);
 
-    // 🎯 處理規格品選擇
+    // 🎯 處理規格品選擇 (修正備註/用料明細混淆問題)
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 🎯 修正點 1: 用料明細 - 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
@@ -1182,10 +1184,14 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
         // 從規格品數據自動填入規格、單位、單價
         update({
             name: spec['品名'] || item.name,
-            // 🎯 關鍵修正 1: 資料拆分精確對應欄位
-            specMain: spec[FIELD_MAIN_SPEC] || "", // 主規格
+            
+            // 資料拆分精確對應欄位
+            specMain: spec[FIELD_MAIN_SPEC] || "", // 主規格 (規格)
             specMaterial: materialSpec, // 用料 1 2 3 合併 (用於顯示)
-            remarks: spec[FIELD_REMARKS] || "", // 備註 (回歸備註欄)
+            
+            // 🎯 修正點 2: 備註 - 確保使用規格品表格中的 '備註' 欄位
+            remarks: spec[FIELD_REMARKS] || "", // 備註 (回歸報價單備註欄)
+            
             unit: spec['單位'] || item.unit,
             price: spec['單價'] || "", 
         });
@@ -1261,7 +1267,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                     type="number" min="0"
                     onChange={(e) => handleNumberChange("price", e.target.value)} />
                 
-                {/* 備註 (col-span-2) - 🎯 關鍵修正 1: 使用 item.remarks */}
+                {/* 備註 (col-span-2) - 🎯 使用 item.remarks */}
                 <input className="border p-1 rounded col-span-2 focus:ring focus:ring-red-100 text-left"
                     value={item.remarks || ""} placeholder="備註"
                     onChange={(e) => update({ remarks: e.target.value })} />
@@ -1276,7 +1282,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
                 </button>
             </div>
             
-            {/* 🎯 關鍵修正 1：用料明細專屬顯示區 */}
+            {/* 🎯 用料明細專屬顯示區 */}
             {(item.specMaterial || "").length > 0 && (
                 <div className="mt-1 ml-4 text-xs text-gray-500 italic border-t pt-1">
                     **用料明細**: {item.specMaterial}
@@ -1658,7 +1664,7 @@ function PrintItemRow({ item, index, isSub = false }) {
     const itemContent = item.name || '';
     const mainSpecContent = (item.specMain && item.specMain.trim() !== '') 
                             ? ` (${item.specMain})` : '';
-    // 🎯 關鍵修正 1: 用料明細專門用於子行顯示 (在下一行 tr 顯示)
+    // 🎯 用料明細專門用於子行顯示 (在下一行 tr 顯示)
     const materialSpecContent = (item.specMaterial && item.specMaterial.trim() !== '') 
                                 ? item.specMaterial : '';
     
@@ -1682,7 +1688,7 @@ function PrintItemRow({ item, index, isSub = false }) {
                 <td style={{ width: '14%', textAlign: 'right' }}>{formatMoney(amount)}</td> 
             </tr>
             
-            {/* 🎯 關鍵修正 1: 如果有用料明細，在下一行以子行方式顯示，並合併儲存格 */}
+            {/* 🎯 如果有用料明細，在下一行以子行方式顯示，並合併儲存格 */}
             {materialSpecContent && (
                 <tr className="page-break-inside-avoid">
                     <td style={{ borderTop: 'none' }}></td> {/* 項次留空 */}
