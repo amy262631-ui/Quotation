@@ -56,8 +56,10 @@
         }
 
         /* 客戶/公司資訊表格 */
+        /* 🎯 修正: 加上邊框線條 */
         .print-info-table {
             width: 100%;
+            border-collapse: collapse;
             border: 2px solid black;
             margin-bottom: 10px;
         }
@@ -74,11 +76,13 @@
         }
 
         /* 報價項目表格 */
+        /* 🎯 修正: 加上邊框線條 */
         table.print-items-table {
             border-collapse: collapse;
             width: 100%;
             font-size: 13px;
             table-layout: fixed; /* 固定列寬 */
+            border: 2px solid black;
         }
 
         .print-items-table th, .print-items-table td {
@@ -147,23 +151,24 @@
 <script type="text/babel">
 // P1 — 公司資料 / 付款條件 / 備註 / 模式模板
 const COMPANY_DATA = {
+    // 🎯 修正 2：統一公司地址為鳳屏二路 383-8 號
     herhsin: {
         name: "何鑫實業股份有限公司",
         tel: "07-6517476",
         fax: "07-6517994",
         email: "admin@herhsin.com",
-        address: "831高雄市大寮區鳳林三路383-3號",
+        address: "831高雄市大寮區鳳屏二路383-8號",
         stamp: "herhsin_stamp_placeholder.png", // 佔位符
-        prefix: "QH" // 🎯 新增: 何鑫報價單編號前綴
+        prefix: "QH" // 何鑫報價單編號前綴
     },
     sinchang: {
         name: "薪昌有限公司",
         tel: "07-6521927",
         fax: "07-6517994",
         email: "affairs@herhsin.com",
-        address: "831高雄市大寮區鳳林三路383-3號",
+        address: "831高雄市大寮區鳳屏二路383-8號",
         stamp: "sinchang_stamp_placeholder.png", // 佔位符
-        prefix: "QS" // 🎯 新增: 薪昌報價單編號前綴
+        prefix: "QS" // 薪昌報價單編號前綴
     }
 };
 
@@ -172,7 +177,7 @@ const DEFAULT_NOTES = `1. 本報價未含加值稅。
 2. 安裝施作時需注意現場作業環境。
 3. 報價單有效期限為 15 天。
 4. 若遇不可抗力因素造成延誤，工期順延。
-5. 料件須由本公司提供與安裝，否則不在保固範圍內。
+5. 料件須由本公司提供與安裝，否6.則不在保固範圍內。
 6. 付款條件依雙方合約內容為準。`;
 
 // 預設付款條件
@@ -266,7 +271,6 @@ function calcNegotiated(total, discountPercent, customPrice) {
 }
 
 // 報價單編號
-// 🎯 修正: 根據傳入的公司類型決定前綴
 function generateQuoteNo(companyKey) {
     const prefix = COMPANY_DATA[companyKey]?.prefix || "Q"; // 使用公司前綴，否則預設 Q
     
@@ -387,7 +391,7 @@ function AppProvider({ children }) {
     const createQuote = React.useCallback((modeId = null) => {
         const mode = QUOTE_MODES.find(m => m.id === modeId);
 
-        // 🎯 修正: 在建立報價單時，根據當前選定的 company 產生編號
+        // 在建立報價單時，根據當前選定的 company 產生編號
         const newQuote = {
             id: uuid(),
             quoteNo: generateQuoteNo(company), // 傳入 company key
@@ -409,7 +413,7 @@ function AppProvider({ children }) {
             setActiveQuoteId(newQuote.id);
             return newList;
         });
-    }, [company]); // 🎯 修正: 依賴項加入 company
+    }, [company]);
 
 
     // 刪除報價單
@@ -788,7 +792,7 @@ function NoteSubItemBlock({ sub, updateField, deleteSubItem }) {
   );
 }
 
-// P4-3（X）SpecItemSuggest — 規格品自動建議元件 (最終修正版 - 移除數量限制)
+// P4-3（X）SpecItemSuggest — 規格品自動建議元件
 function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
     
     // 搜尋結果，移除 5 個的限制
@@ -805,7 +809,6 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
                 // 擴大篩選：規格1也包含關鍵字 (用於區分同品名不同規格)
                 (item['規格1'] && item['規格1'].toLowerCase().includes(input))
             );
-            // 🎯 修正: 移除 .slice(0, 5);
     }, [currentInput, specItems]);
 
     // 如果列表是空的，直接返回 null
@@ -823,12 +826,12 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
                 <div
                     key={index}
                     className="p-2 cursor-pointer hover:bg-blue-100 text-sm border-b last:border-b-0"
-                    onMouseDown={(e) => { // 🎯 修正: 使用 onMouseDown 而不是 onClick/onMouseUp 來確保在 onBlur 之前觸發
+                    onMouseDown={(e) => { // 使用 onMouseDown 而不是 onClick/onMouseUp 來確保在 onBlur 之前觸發
                         e.preventDefault(); // 防止 input 失去焦點
                         handleSelect(item); 
                     }}
                 >
-                    {/* 🎯 修正: 顯示 品名, 規格1, 單價，以利使用者區分 */}
+                    {/* 顯示 品名, 規格1, 單價，以利使用者區分 */}
                     <div className="font-semibold text-gray-800">{item['品名']}</div>
                     <div className="text-xs text-gray-600 truncate">
                         規格: {item['規格1'] || '無規格'} | 單位: {item['單位'] || 'N/A'} | 單價: {formatMoney(item['單價'])}
@@ -844,7 +847,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
 function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
     const { specItems } = React.useContext(AppContext); // 取得規格品列表
     
-    // 🎯 修正：新增狀態來控制建議列表的顯示/隱藏
+    // 新增狀態來控制建議列表的顯示/隱藏
     const [showSuggest, setShowSuggest] = React.useState(false); 
 
     // 計算並格式化小計
@@ -858,16 +861,16 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
         }
     }, [updateField]);
     
-    // 處理規格品選擇 (使用實際欄位：規格1, 單位, 單價)
+    // 🎯 修正 3：處理規格品選擇 (確保單價可以自動填入)
     const handleSelectSpecItem = React.useCallback((spec) => {
         // 從規格品數據自動填入規格、單位、單價
-        // 🎯 修正: 確保欄位名稱與 Google Sheet 圖片一致
         updateField("name", spec['品名'] || sub.name);
         updateField("spec", spec['規格1'] || sub.spec); // <-- 使用 '規格1'
         updateField("unit", spec['單位'] || sub.unit);
-        updateField("price", spec['單價'] || sub.price);
-        setShowSuggest(false); // 🎯 修正：選完後隱藏列表
-    }, [updateField, sub.name, sub.spec, sub.unit, sub.price]);
+        // 關鍵修正: 確保單價 price 被填入
+        updateField("price", spec['單價'] || ""); 
+        setShowSuggest(false); // 選完後隱藏列表
+    }, [updateField, sub.name, sub.spec, sub.unit]);
 
     return (
         <div className="border rounded p-3 bg-gray-50 mb-2">
@@ -891,13 +894,13 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
                         placeholder="名稱"
                         onChange={(e) => {
                             updateField("name", e.target.value);
-                            setShowSuggest(true); // 🎯 修正：輸入時顯示建議
+                            setShowSuggest(true); // 輸入時顯示建議
                         }}
-                        onBlur={() => setTimeout(() => setShowSuggest(false), 200)} // 🎯 修正：失去焦點時隱藏
+                        onBlur={() => setTimeout(() => setShowSuggest(false), 200)} // 失去焦點時隱藏
                         onFocus={() => (sub.name || "").length >= 1 && setShowSuggest(true)} // 取得焦點時顯示
                     />
                     
-                    {/* 🎯 修正：只有在 showSuggest 為 true 且輸入字數滿足條件時才渲染 */}
+                    {/* 只有在 showSuggest 為 true 且輸入字數滿足條件時才渲染 */}
                     {(sub.name || "").length >= 1 && showSuggest && (
                         <SpecItemSuggest 
                             currentInput={sub.name} 
@@ -1053,8 +1056,8 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 }
 
 
-// P4-3（F）MainItemBlock — 大項編輯 (最終修正版: 處理單價連動)
-function MainItemBlock({ item, quote, updateQuote, index }) { // 🎯 修正: 接收 index 屬性
+// P4-3（F）MainItemBlock — 大項編輯 (關鍵修正: 確保單價連動)
+function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index 屬性
     const { specItems } = React.useContext(AppContext);
     
     const [showSuggest, setShowSuggest] = React.useState(false); 
@@ -1101,18 +1104,18 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 🎯 修正: �
         updateQuote(quote.id, { items: newItems });
     }, [quote.id, item.id, quote.items, updateQuote]);
 
-    // 5. 處理規格品選擇 (使用實際欄位：規格1, 單位, 單價)
+    // 🎯 修正 3：處理規格品選擇 (確保單價可以自動填入)
     const handleSelectSpecItem = React.useCallback((spec) => {
-        // 🎯 修正: 確保欄位名稱與 Google Sheet 圖片一致
+        // 從規格品數據自動填入規格、單位、單價
         update({
             name: spec['品名'] || item.name,
             spec: spec['規格1'] || item.spec, 
             unit: spec['單位'] || item.unit,
-            // 確保 price 被正確地填入，即使它是空字串
+            // 關鍵修正: 確保 price 被填入
             price: spec['單價'] || "", 
         });
         setShowSuggest(false);
-    }, [update, item.name, item.spec, item.unit, item.price]);
+    }, [update, item.name, item.spec, item.unit]);
 
     const mainTotal = formatMoney(calcAmount(item));
 
@@ -1213,14 +1216,14 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 🎯 修正: �
         </div>
     );
 }
-// P4-3（G）ItemsEditor — 整體品項管理 (修正: 處理自動編號)
+// P4-3（G）ItemsEditor — 整體品項管理
 function ItemsEditor({ quote, updateQuote }) {
     // 1. 新增大項 (Hooks 必須放在頂層)
     const addMain = React.useCallback(() => {
         const newMain = {
             id: uuid(),
             type: "main",
-            name: "", // 🎯 修正: 預設為空字串，避免手動刪除 "未命名大項"
+            name: "", // 預設為空字串
             spec: "",
             unit: "",
             qty: "",
@@ -1251,7 +1254,7 @@ function ItemsEditor({ quote, updateQuote }) {
                     item={item}
                     quote={quote}
                     updateQuote={updateQuote}
-                    index={index + 1} // 🎯 修正: 傳遞從 1 開始的編號
+                    index={index + 1} // 傳遞從 1 開始的編號
                 />
             ))}
 
@@ -1360,7 +1363,7 @@ function PriceSummary({ quote, update }) {
     );
 }
 
-// P6 — Excel 匯出功能 (保持不變)
+// P6 — Excel 匯出功能
 function exportToExcel(quote, companyInfo) {
     
     if (!quote) {
@@ -1493,22 +1496,16 @@ function ExcelExporter() {
 function PrintButton() {
     const { activeQuote } = React.useContext(AppContext);
     
-    // 🎯 修正: 列印時直接針對 #quotePreviewArea 進行列印
+    // 列印時直接針對 #quotePreviewArea 進行列印
     const handlePrint = React.useCallback(() => {
         if (!activeQuote) {
             alert("請先選擇或建立一份報價單。");
             return;
         }
         
-        // 🎯 新增：檢查 ReactDOMServer 是否已載入
-        if (typeof ReactDOMServer === 'undefined' || typeof ReactDOMServer.renderToString !== 'function') {
-             console.error("ReactDOMServer 尚未載入或載入失敗。請檢查 HTML 檔案頂部的 <script> 標籤是否正確。");
-             alert("列印功能載入失敗，請檢查瀏覽器錯誤訊息：(ReactDOMServer is undefined)。");
-             // 嘗試重新載入，但更可靠的作法是調整 HTML 結構
-             return;
-        }
-
-        // 觸發瀏覽器列印對話框
+        // 🎯 修正: 由於 ReactDOMServer 已在 HTML 頂部優先載入，
+        // 這裡只需要直接呼叫 window.print() 即可
+        // 因為 PrintLayout 已經被靜態渲染到 #quotePreviewArea
         window.print();
         
     }, [activeQuote]);
@@ -1534,7 +1531,7 @@ function PrintItemRow({ item, index, isSub = false }) {
         // 補充文字
         return (
             <tr className="page-break-inside-avoid">
-                <td colSpan="7" style={{ borderTop: 'none', padding: '0 6px 4px 6px' }}>
+                <td colSpan="7" style={{ borderTop: 'none', padding: '0 6px 4px 6px', fontWeight: 'normal', color: '#333' }}>
                     **補充說明:** <span style={{ whiteSpace: 'pre-wrap' }}>{item.text}</span>
                 </td>
             </tr>
@@ -1694,7 +1691,6 @@ function QuotePreview() {
         <div className="mt-8 border-t pt-4 bg-gray-100 p-6 no-print">
             <h2 className="text-xl font-bold mb-4 text-gray-700">📄 即時報價單預覽 (列印版面)</h2>
             <div id="previewContainer" className="bg-white shadow-xl p-8 max-w-4xl mx-auto border border-gray-300">
-                {/* 🎯 修正: 為了讓 CSS 樣式作用於列印，這裡需要直接渲染 PrintLayout */}
                 <PrintLayout quote={activeQuote} />
             </div>
         </div>
@@ -1702,9 +1698,23 @@ function QuotePreview() {
 }
 
 
-// P8 — App（主要佈局） (新增列印按鈕)
+// P8 — App（主要佈局）
 function App() {
     const { activeQuote, updateQuote, activeQuoteId, loadSpecItems } = React.useContext(AppContext);
+    
+    // 🎯 修正: 為了讓 ReactDOMServer.renderToString 在列印時能抓到最新的 activeQuote
+    // 我們需要將 PrintLayout 的內容靜態渲染到 #quotePreviewArea
+    // 這裡我們在每次 activeQuote 變動時更新靜態 HTML
+    React.useEffect(() => {
+        if (activeQuote && typeof ReactDOMServer !== 'undefined' && typeof ReactDOMServer.renderToString === 'function') {
+            const html = ReactDOMServer.renderToString(<PrintLayout quote={activeQuote} />);
+            const previewArea = document.getElementById('quotePreviewArea');
+            if (previewArea) {
+                previewArea.innerHTML = html;
+            }
+        }
+    }, [activeQuote]);
+
 
     // 如果沒有報價單，顯示提示
     if (!activeQuoteId) {
@@ -1768,7 +1778,7 @@ function App() {
                     </div>
                 </div>
                 
-                {/* 🎯 修正: 底部即時報價單預覽區 */}
+                {/* 底部即時報價單預覽區 */}
                 <QuotePreview />
 
             </div>
@@ -1787,9 +1797,6 @@ function renderApp() {
             <App />
         </AppProvider>
     );
-
-    // 🎯 修正: 不再需要手動靜態渲染到 #quotePreviewArea，因為 QuotePreview 組件在 App 內部處理了。
-    // 關鍵是確保 ReactDOMServer 在 App 腳本前載入，這已在 HTML 頂部完成。
 }
 
 // 啟動渲染
