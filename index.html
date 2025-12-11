@@ -864,7 +864,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 {/* 規格 (主描述) */}
                                 <input
                                     type="text"
-                                    value={sub.specMain}
+                                    value={sub.specMain ?? ""}
                                     onChange={(e) => handleUpdateSubItem(sub.id, { specMain: e.target.value })}
                                     placeholder="規格 (主描述)"
                                     className="border p-1 rounded text-sm"
@@ -872,7 +872,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 {/* 單位 */}
                                 <input
                                     type="text"
-                                    value={sub.unit}
+                                    value={sub.unit ?? ""}
                                     onChange={(e) => handleUpdateSubItem(sub.id, { unit: e.target.value })}
                                     placeholder="單位"
                                     className="border p-1 rounded text-sm text-center"
@@ -880,7 +880,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 {/* 數量 */}
                                 <input
                                     type="number"
-                                    value={sub.qty}
+                                    value={sub.qty ?? 0}
                                     onChange={(e) => handleUpdateSubItem(sub.id, { qty: e.target.value })}
                                     placeholder="數量"
                                     min="0"
@@ -889,7 +889,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 {/* 單價 */}
                                 <input
                                     type="number"
-                                    value={sub.price}
+                                    value={sub.price ?? 0}
                                     onChange={(e) => handleUpdateSubItem(sub.id, { price: e.target.value })}
                                     placeholder="單價"
                                     min="0"
@@ -907,7 +907,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                             <div className='col-span-6'>
                                 <input
                                     type="text"
-                                    value={sub.name} // 補充文字/圖片的標題
+                                    value={sub.name ?? ""} // 補充文字/圖片的標題
                                     onChange={(e) => handleUpdateSubItem(sub.id, { name: e.target.value })}
                                     placeholder={isText ? "輸入補充文字標題" : "輸入圖片標題 (例如: 設備俯視圖)"}
                                     className="w-full border p-1 rounded text-sm bg-yellow-50"
@@ -960,7 +960,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 
                                 {isText && (
                                     <textarea
-                                        value={sub.remarks} // 用 remarks 欄位來放文字內容
+                                        value={sub.remarks ?? ""} // 用 remarks 欄位來放文字內容
                                         onChange={(e) => handleUpdateSubItem(sub.id, { remarks: e.target.value })}
                                         placeholder="輸入文字內容 (將顯示在報價單上)"
                                         rows="3"
@@ -1012,7 +1012,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                         {/* 規格 (主描述) */}
                         <input
                             type="text"
-                            value={item.specMain}
+                            value={item.specMain ?? ""}
                             onChange={(e) => updateItem({ specMain: e.target.value })}
                             placeholder="規格 (主描述)"
                             className="border p-2 rounded text-sm"
@@ -1021,7 +1021,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                         {/* 單位 */}
                         <input
                             type="text"
-                            value={item.unit}
+                            value={item.unit ?? ""}
                             onChange={(e) => updateItem({ unit: e.target.value })}
                             placeholder="單位"
                             className="border p-2 rounded text-sm text-center"
@@ -1030,7 +1030,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                         {/* 數量 */}
                         <input
                             type="number"
-                            value={item.qty}
+                            value={item.qty ?? 0}
                             onChange={(e) => updateItem({ qty: e.target.value })}
                             placeholder="數量"
                             min="0"
@@ -1040,7 +1040,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                         {/* 單價 */}
                         <input
                             type="number"
-                            value={item.price}
+                            value={item.price ?? 0}
                             onChange={(e) => updateItem({ price: e.target.value })}
                             placeholder="單價"
                             min="0"
@@ -1060,7 +1060,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                     <div className="mt-2">
                         <input
                             type="text"
-                            value={item.remarks}
+                            value={item.remarks ?? ""}
                             onChange={(e) => updateItem({ remarks: e.target.value })}
                             placeholder="備註 (將顯示在報價單備註欄)"
                             className="w-full border p-2 rounded text-sm bg-yellow-50"
@@ -1498,74 +1498,80 @@ function ExportButton() {
 }
 
 // --------------------------------------------------
-// 列印按鈕
+// 列印按鈕（修正版）
 // --------------------------------------------------
 function PrintButton({ quote, totalAmount, negotiatedAmount }) {
-    
-    // 檢查 ReactDOMServer 是否已載入
-    const isReactDOMServerAvailable = typeof ReactDOMServer !== 'undefined' && ReactDOMServer.renderToStaticMarkup;
 
-    const handlePrint = () => {
-        
-        if (!isReactDOMServerAvailable) {
-            // V22 修正: 檢查是否是因為載入錯誤 (例如 404)
-            alert('列印失敗：ReactDOMServer 模組尚未準備好。請檢查網路連線或稍候再試。');
-            return;
-        }
-        
-        if (!quote) {
-            alert('列印失敗：請先選擇或建立一份報價單。');
-            return;
-        }
+  // 比較保險的 ReactDOMServer 檢查寫法
+  const isReactDOMServerAvailable =
+    typeof window !== "undefined" &&
+    window.ReactDOMServer &&
+    typeof window.ReactDOMServer.renderToStaticMarkup === "function";
 
-        const printArea = document.getElementById('quotePreviewArea');
-        
-        if (!printArea) {
-            alert('列印失敗：報價單預覽區域 (quotePreviewArea) 尚未載入。請稍候幾秒再試一次。');
-            return;
-        }
+  const handlePrint = () => {
+    // 1. 確認有選到報價單
+    if (!quote) {
+      alert("列印失敗：請先選擇或建立一份報價單。");
+      return;
+    }
 
-        // 渲染 PrintLayout
-        const printComponent = React.createElement(PrintLayout, { 
-            quote, 
-            totalAmount, 
-            negotiatedAmount,
-            isPreview: false
-        });
-        
-        // 使用靜態渲染生成 HTML 字串
-        let htmlContent;
-        try {
-             htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
-        } catch (e) {
-             console.error("ReactDOMServer 渲染失敗:", e);
-             alert(`列印渲染失敗: ${e.message}. 請檢查主控台錯誤。`);
-             return;
-        }
-       
+    // 2. 確認 ReactDOMServer 有載入成功
+    if (!isReactDOMServerAvailable) {
+      alert(
+        "列印失敗：ReactDOMServer 模組尚未準備好。\n請確認 <react-dom-server> 的 <script> 有正確載入。"
+      );
+      return;
+    }
 
-        // 將 HTML 內容注入到預覽區
-        printArea.innerHTML = htmlContent;
+    // 3. 取得預覽容器
+    const printArea = document.getElementById("quotePreviewArea");
+    if (!printArea) {
+      alert(
+        "列印失敗：找不到列印用容器 quotePreviewArea。\n請確認 <div id=\"quotePreviewArea\"></div> 是否存在。"
+      );
+      return;
+    }
 
-        // 觸發瀏覽器列印對話框
-        window.print();
-        
-        // 清空預覽區的內容，避免污染畫面
-        // 延遲清空以確保列印對話框有時間讀取內容
-        setTimeout(() => {
-            printArea.innerHTML = '';
-        }, 100); 
-    };
+    // 4. 建立要列印的 React 元件
+    const printComponent = React.createElement(PrintLayout, {
+      quote,
+      totalAmount,
+      negotiatedAmount,
+      isPreview: false,
+    });
 
-    return (
-        <button
-            className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700"
-            onClick={handlePrint}
-            disabled={!quote || !isReactDOMServerAvailable}
-        >
-            列印報價單
-        </button>
-    );
+    // 5. 用 ReactDOMServer 轉成靜態 HTML
+    let htmlContent = "";
+    try {
+      htmlContent = window.ReactDOMServer.renderToStaticMarkup(printComponent);
+    } catch (e) {
+      console.error("ReactDOMServer 渲染失敗:", e);
+      alert("列印渲染失敗：" + e.message);
+      return;
+    }
+
+    // 6. 塞到列印容器裡
+    printArea.innerHTML = htmlContent;
+
+    // 7. 觸發瀏覽器列印
+    window.print();
+
+    // 8. 稍微延遲後把內容清掉，避免影響畫面
+    setTimeout(() => {
+      printArea.innerHTML = "";
+    }, 100);
+  };
+
+  return (
+    <button
+      className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700"
+      onClick={handlePrint}
+      // 只在「沒有 activeQuote」的時候禁用，ReactDOMServer 不再拿來鎖按鈕
+      disabled={!quote}
+    >
+      列印報價單
+    </button>
+  );
 }
 
 
