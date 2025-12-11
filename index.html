@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- V17 (最終修復)</title>
+    <title>工程報價系統（Herhsin & SinChang）- V18 (終極修復)</title>
 
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
@@ -67,12 +67,11 @@
         .print-info-table {
             width: 100%;
             border-collapse: collapse;
-            /* 移除外側邊框，讓單元格邊框統一控制 */
-            /* border: 1px solid black;  */ 
+            border: 1px solid black !important; /* 確保外框線 */
             margin-bottom: 15px;
         }
         .print-info-table td {
-            border: 1px solid black; /* 確保單元格有邊框 */
+            border: 1px solid black !important; /* 確保單元格有邊框 */
             padding: 4px 8px;
             vertical-align: middle;
             height: 25px; 
@@ -92,11 +91,12 @@
             width: 100%;
             font-size: 13px;
             table-layout: fixed; 
-            border: 1px solid black; /* 外側線條 */
+            border: 1px solid black !important; /* 外側線條 */
         }
 
+        /* 🎯 強化內線條 */
         .print-items-table th, .print-items-table td {
-            border: 1px solid black; /* 內側線條 (確保縱向和水平線) */
+            border: 1px solid black !important; /* 內側線條 (確保縱向和水平線) */
             padding: 4px 6px;
             vertical-align: top;
             line-height: 1.4;
@@ -129,7 +129,7 @@
         
         /* 總計區塊 */
         .print-total-box {
-            border: 1px solid black;
+            border: 1px solid black !important;
             padding: 10px;
             font-size: 14px;
             margin-top: 10px;
@@ -146,14 +146,14 @@
         /* 備註/付款條件區塊邊框強化 */
         .print-notes-box {
             margin-top: 15px;
-            border: 1px solid black; 
+            border: 1px solid black !important; 
             padding: 10px;
             white-space: pre-wrap; 
         }
         
         /* 總計列加粗上線 */
         .print-items-table .total-row {
-            border-top: 2px solid black; 
+            border-top: 2px solid black !important; 
         }
         
         /* 修正 React 警告：tr 內不應有額外的空白節點 */
@@ -318,7 +318,7 @@ function calcNegotiated(total, discountPercent, customPrice) {
     if (cp > 0) return cp;
     
     // 折扣次之
-    if (dp > 0 && dp < 100) {
+    if (dp > 0 && dp <= 100) { // 允許 100% 折扣 (變成 0)
         // 四捨五入
         return Math.round(total * (1 - dp / 100));
     }
@@ -1586,42 +1586,37 @@ function PrintButton() {
     const handlePrint = React.useCallback(() => {
         if (!activeQuote) return;
 
-        // 🎯 關鍵修正 4：將靜態渲染和列印操作放入 setTimeout 中，提高穩定性
-        // 確保 DOM 已經更新完畢，且所有腳本（尤其是 ReactDOMServer）已載入。
-        setTimeout(() => {
-            const previewArea = document.getElementById("quotePreviewArea");
-            
-            if (typeof ReactDOMServer === 'undefined' || !ReactDOMServer.renderToString) {
-                console.error("列印失敗：ReactDOMServer 模組尚未準備好。");
-                alert("列印失敗：列印引擎載入錯誤。請稍後再試。");
-                return;
-            }
+        const previewArea = document.getElementById("quotePreviewArea");
+        
+        if (typeof ReactDOMServer === 'undefined' || !ReactDOMServer.renderToString) {
+            console.error("列印失敗：ReactDOMServer 模組尚未準備好。");
+            alert("列印失敗：列印引擎載入錯誤。請稍後再試。");
+            return;
+        }
 
+        let printHtml = '';
+        try {
             // 1. 使用靜態渲染生成 HTML 字串
-            let printHtml = '';
-            try {
-                // 在 PrintLayout 中使用 activeQuote 和 company 數據
-                printHtml = ReactDOMServer.renderToString(
-                    <PrintLayout quote={activeQuote} company={company} />
-                );
-            } catch (error) {
-                console.error("靜態渲染 PrintLayout 失敗:", error);
-                alert("列印失敗：報價單預覽內容生成錯誤。");
-                return;
-            }
+            printHtml = ReactDOMServer.renderToString(
+                <PrintLayout quote={activeQuote} company={company} />
+            );
+        } catch (error) {
+            console.error("靜態渲染 PrintLayout 失敗:", error);
+            alert("列印失敗：報價單預覽內容生成錯誤。");
+            return;
+        }
 
-            // 2. 注入生成的 HTML
-            previewArea.innerHTML = printHtml;
-            
-            // 3. 觸發列印
-            window.print();
-            
-            // 4. 列印完畢後，清除預覽區內容（讓它恢復為 CSS 隱藏的狀態）
-            setTimeout(() => {
-                previewArea.innerHTML = ''; 
-            }, 100);
-            
-        }, 50); // 延遲 50ms 執行
+        // 2. 注入生成的 HTML
+        previewArea.innerHTML = printHtml;
+        
+        // 3. 立即觸發列印 (V18 修正：移除多餘 setTimeout，以確保最快反應)
+        window.print();
+        
+        // 4. 列印對話框關閉後（或很快），清除預覽區內容
+        // 由於 window.print() 是阻塞性的，這裡使用 setTimeout 0ms 確保在列印後立即執行
+        setTimeout(() => {
+            previewArea.innerHTML = ''; 
+        }, 0);
         
     }, [activeQuote, company]);
 
@@ -1743,8 +1738,7 @@ const PrintLayout = ({ quote, company }) => {
     // 總價大寫轉換 (簡化，僅為範例，實際需更完整的函式)
     const chineseTotal = `NT$ ${formatMoney(negotiated)}`;
     
-    // 🎯 關鍵修正 2：總價區塊是否需要顯示詳細資訊的判斷
-    // 只有當計算後的價格與原始價格不同時，才顯示原始價格、折扣/議價明細。
+    // 🎯 關鍵修正 3：總價區塊是否需要顯示詳細資訊的判斷
     const showNegotiationDetails = total !== negotiated;
 
     return (
@@ -1765,10 +1759,9 @@ const PrintLayout = ({ quote, company }) => {
                 </h2>
             </div>
 
-            {/* B. 客戶與報價資訊表格表格 (🎯 關鍵修正 1: 確保框線) */}
+            {/* B. 客戶與報價資訊表格表格 (🎯 關鍵修正 5: 調整排版，移除空白節點) */}
             <table className="print-info-table mb-4">
                 <tbody>
-                    {/* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */}
                     <tr>
                         <td className="print-info-label">客戶名稱</td><td>{quote.customerName}</td><td className="print-info-label">聯絡人</td><td>{quote.contact}</td>
                     </tr>
@@ -1784,10 +1777,9 @@ const PrintLayout = ({ quote, company }) => {
                 </tbody>
             </table>
 
-            {/* C. 報價項目表格 (🎯 關鍵修正 1: 線條強化) */}
+            {/* C. 報價項目表格 (🎯 關鍵修正 1: 線條強化 & 修正 5: 調整排版，移除空白節點) */}
             <table className="print-items-table">
                 <thead>
-                    {/* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/th 間的空白節點警告 */}
                     <tr>
                         <th style={{ width: '5%' }}>項次</th><th style={{ width: '20%' }}>品名</th><th style={{ width: '25%' }}>規格 / 用料明細</th><th style={{ width: '8%' }}>單位</th><th style={{ width: '8%' }}>數量</th><th style={{ width: '10%' }}>單價</th><th style={{ width: '12%' }}>金額 (小計)</th><th style={{ width: '12%' }}>備註</th>
                     </tr>
@@ -1806,7 +1798,6 @@ const PrintLayout = ({ quote, company }) => {
                         
                         // 主項資料列
                         const mainRow = (
-                            /* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */
                             <tr key={item.id} className="font-bold">
                                 <td className="text-center">{index + 1}</td><td>{item.name}</td><td>{specAndMaterial || item.name}</td><td className="text-center">{item.unit}</td><td>{formatMoney(item.qty)}</td><td>{formatMoney(item.price)}</td><td>{formatMoney(calcAmount(item))}</td><td>{item.remarks}</td>
                             </tr>
@@ -1817,7 +1808,6 @@ const PrintLayout = ({ quote, company }) => {
                             
                             if (sub.type === 'note') {
                                 return (
-                                    /* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */
                                     <tr key={sub.id} className="text-gray-600 italic text-xs sub-item-note">
                                         <td colSpan="8"><span className="font-bold mr-2">補充說明：</span>{sub.text}</td>
                                     </tr>
@@ -1834,7 +1824,6 @@ const PrintLayout = ({ quote, company }) => {
                                 ].filter(s => s.length > 0).join('\n');
 
                                 return (
-                                    /* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */
                                     <tr key={sub.id} className="text-sm">
                                         <td className="text-center text-xs"></td><td className="pl-4 italic">{sub.name}</td><td>{subSpecAndMaterial}</td><td className="text-center">{sub.unit}</td><td>{formatMoney(sub.qty)}</td><td>{formatMoney(sub.price)}</td><td>{formatMoney(calcAmount(sub))}</td><td>{sub.remarks}</td>
                                     </tr>
@@ -1843,7 +1832,6 @@ const PrintLayout = ({ quote, company }) => {
                             
                             if (sub.type === 'image') {
                                 return (
-                                    /* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */
                                     <tr key={sub.id}><td colSpan="8" className="text-center p-3"><img src={sub.src} alt="工程圖片" className="print-image mx-auto" /></td></tr>
                                 );
                             }
@@ -1856,9 +1844,8 @@ const PrintLayout = ({ quote, company }) => {
                     })}
 
                     {/* 總計列 */}
-                    {/* 🎯 關鍵修正 5：調整 JSX 排版，避免 tr/td 間的空白節點警告 */}
                     <tr className="total-row font-bold">
-                        <td colSpan="6" className="text-right text-lg" style={{ border: '1px solid black' }}>總計金額 (未稅):</td><td className="text-right text-lg text-blue-800" style={{ border: '1px solid black' }}>{formatMoney(total)}</td><td style={{ border: '1px solid black' }}></td>
+                        <td colSpan="6" className="text-right text-lg" style={{ border: '1px solid black !important' }}>總計金額 (未稅):</td><td className="text-right text-lg text-blue-800" style={{ border: '1px solid black !important' }}>{formatMoney(total)}</td><td style={{ border: '1px solid black !important' }}></td>
                     </tr>
                 </tbody>
             </table>
@@ -1866,7 +1853,7 @@ const PrintLayout = ({ quote, company }) => {
             {/* D. 總價與折扣 */}
             <div className="mt-4 flex justify-between items-start">
                 
-                {/* 備註與付款條件 (🎯 關鍵修正 3: 確保抓取 quote.notes/quote.payment) */}
+                {/* 備註與付款條件 (🎯 關鍵修正 2: 確保備註和付款條件正確顯示) */}
                 <div className="w-2/3 mr-4 print-notes-box p-3">
                     <div className="flex">
                         <div className="w-1/2 pr-2">
@@ -1882,7 +1869,7 @@ const PrintLayout = ({ quote, company }) => {
                     </div>
                 </div>
 
-                {/* 最終總價區塊 (🎯 關鍵修正 2: 顯示邏輯 - 只有價格不同時才顯示明細) */}
+                {/* 最終總價區塊 (🎯 關鍵修正 3: 顯示邏輯 - 只有價格不同時才顯示明細) */}
                 <div className="w-1/3 border-2 border-black p-3 text-sm">
                     {/* 僅在有折扣或議價時顯示細節 (showNegotiationDetails 為 true) */}
                     {showNegotiationDetails ? (
@@ -1893,14 +1880,15 @@ const PrintLayout = ({ quote, company }) => {
                             </div>
                             
                             {/* 顯示折扣或議價的計算結果 */}
-                            {(quote.discountPercent > 0 || total > negotiated) && (
+                            {/* V18 修正：只有當計算出來有折讓，且不是自定義價格的情況下才顯示 */}
+                            {(quote.discountPercent > 0 && quote.negotiatedPrice === 0) && (
                                 <div className="flex justify-between">
-                                    <span>折扣/議價 (總折讓):</span>
+                                    <span>折扣 ({quote.discountPercent}%):</span>
                                     <span> - {formatMoney(total - negotiated)}</span>
                                 </div>
                             )}
 
-                            {quote.negotiatedPrice > 0 && total !== quote.negotiatedPrice && (
+                            {(quote.negotiatedPrice > 0 && total !== quote.negotiatedPrice) && (
                                 <div className="flex justify-between">
                                     <span>議價後價格 (自定義):</span>
                                     <span> {formatMoney(quote.negotiatedPrice)}</span>
