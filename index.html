@@ -1498,41 +1498,39 @@ function ExportButton() {
 }
 
 // --------------------------------------------------
-// 列印按鈕（最終修正版）
+// 列印按鈕（使用 ReactDOMServer）
 // --------------------------------------------------
 function PrintButton({ quote, totalAmount, negotiatedAmount }) {
+  // 直接檢查全域的 ReactDOMServer（不用 window.）
+  const isReactDOMServerAvailable =
+    typeof ReactDOMServer !== "undefined" &&
+    typeof ReactDOMServer.renderToStaticMarkup === "function";
+
   const handlePrint = () => {
-    // 1. 必須先有報價單
+    // 1. 確認有選到報價單
     if (!quote) {
       alert("列印失敗：請先選擇或建立一份報價單。");
       return;
     }
 
-    // 2. 確認 ReactDOMServer 是否可用（注意：這裡用的是「ReactDOMServer」不是 window.ReactDOMServer）
-   if (
-  !window.ReactDOMServer ||
-  typeof window.window.ReactDOMServer.renderToStaticMarkup !== "function" ||
-  typeof window.ReactDOMServer.renderToString !== "function"
-) {
-  console.log("ReactDOMServer 檢查：", window.ReactDOMServer);
-  alert(
-    "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
-    "請確認已載入 CDN：https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js"
-  );
-  return;
-}
+    // 2. 確認 ReactDOMServer 有載入成功
+    if (!isReactDOMServerAvailable) {
+      console.log("ReactDOMServer 檢查：", ReactDOMServer);
+      alert("列印失敗：ReactDOMServer 模組尚未準備好。");
+      return;
+    }
 
-    // 3. 找到列印容器
+    // 3. 取得預覽容器
     const printArea = document.getElementById("quotePreviewArea");
     if (!printArea) {
       alert(
         "列印失敗：找不到列印用容器 quotePreviewArea。\n" +
-          "請確認 <div id=\"quotePreviewArea\"></div> 是否存在。"
+          "請確認 index.html 裡有 <div id=\"quotePreviewArea\"></div>。"
       );
       return;
     }
 
-    // 4. 建立列印用 React 元件
+    // 4. 建立要列印的 React 元件
     const printComponent = React.createElement(PrintLayout, {
       quote,
       totalAmount,
@@ -1543,30 +1541,30 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     // 5. 用 ReactDOMServer 轉成靜態 HTML
     let htmlContent = "";
     try {
-      htmlContent = window.ReactDOMServer.renderToStaticMarkup(printComponent);
+      htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
     } catch (e) {
       console.error("ReactDOMServer 渲染失敗:", e);
       alert("列印渲染失敗：" + e.message);
       return;
     }
 
-    // 6. 塞進列印容器
+    // 6. 塞到列印容器裡
     printArea.innerHTML = htmlContent;
 
     // 7. 觸發瀏覽器列印
     window.print();
 
-    // 8. 稍微延遲後把內容清掉，避免影響畫面
+    // 8. 列印後清空內容，避免影響畫面
     setTimeout(() => {
       printArea.innerHTML = "";
-    }, 200);
+    }, 100);
   };
 
   return (
     <button
       className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700"
       onClick={handlePrint}
-      disabled={!quote} // 只有沒有 activeQuote 時不給按
+      disabled={!quote}
     >
       列印報價單
     </button>
