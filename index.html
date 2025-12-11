@@ -1515,11 +1515,12 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     ) {
       console.log("ReactDOMServer 檢查：", ReactDOMServer);
       alert(
-        "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
-          "請確認 <script src=\"https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js\"></script>\n" +
-          "有放在 index.html，並且寫在 <script type=\"text/babel\"> 之前。"
-      );
-      return;
+  "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
+  "請確認已在 index.html 中加入 ReactDOMServer CDN：\n" +
+  "https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js\n" +
+  "並且放在 <script type=\"text/babel\"> 之前。"
+     );
+     return;
     }
 
     // 3. 找到列印容器
