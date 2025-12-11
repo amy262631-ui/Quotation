@@ -326,7 +326,9 @@ async function loadCSV(url) {
                 if (value.startsWith('"') && value.endsWith('"')) {
                     value = value.substring(1, value.length - 1);
                 }
+                if (h === "備註") return;  // ← 強制忽略 Google Sheet 備註欄
                 obj[h] = value;
+
             });
             return obj;
         });
@@ -822,7 +824,9 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
             qty: 1,
             price: 0,
             // V22 修正: 圖片專用的 URL 欄位
-            imageUrl: type === 'image' ? '' : undefined, 
+            imageUrl: type === 'image' ? '' : undefined,
+            isLocalImage: type === 'image' ? true : false, 
+
             remarks: type === 'text' ? '' : undefined
         };
         updateItem({ subItems: [...(item.subItems || []), newSub] });
@@ -913,22 +917,44 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                 />
                                 
                                 {isImage && (
-                                    <>
-                                    {/* V22 修正: 使用 sub.imageUrl 儲存實際 URL */}
-                                    <input
-                                        type="text"
-                                        value={sub.imageUrl} 
-                                        onChange={(e) => handleUpdateSubItem(sub.id, { imageUrl: e.target.value })}
-                                        placeholder="輸入圖片 URL 連結"
-                                        className="w-full border p-1 mt-1 rounded text-sm bg-yellow-50"
-                                    />
-                                    {sub.imageUrl && (
-                                        <div className='mt-2'>
-                                            <img src={sub.imageUrl} alt="Preview" className="max-w-xs max-h-32 object-contain border p-1" />
-                                        </div>
-                                    )}
-                                    </>
-                                )}
+  <div className="col-span-6 mt-1">
+    <input
+      type="text"
+      value={sub.name}
+      onChange={(e) => handleUpdateSubItem(sub.id, { name: e.target.value })}
+      placeholder="圖片標題（例如：現場照片）"
+      className="w-full border p-1 rounded text-sm bg-yellow-50"
+    />
+
+    {/* 圖片選擇按鈕 */}
+    <input
+      type="file"
+      accept="image/*"
+      className="mt-2"
+      onChange={(e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          handleUpdateSubItem(sub.id, { imageUrl: ev.target.result }); // base64
+        };
+        reader.readAsDataURL(file);
+      }}
+    />
+
+    {/* 預覽圖片 */}
+    {sub.imageUrl && (
+      <div className="mt-2">
+        <img
+          src={sub.imageUrl}
+          alt="補充圖片"
+          className="max-w-xs max-h-40 object-contain border p-1"
+        />
+      </div>
+    )}
+  </div>
+)}
                                 
                                 {isText && (
                                     <textarea
@@ -1687,11 +1713,24 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                 } else if (sub.type === 'text') {
                     // 補充文字
                     rows.push(
-                        <tr key={sub.id + '-text'} className="sub-item-note">
-                            {/* V22: 刪除 tr 內部的換行，解決 DOM 嵌套警告 */}
-                            <td colSpan="8" style={{ ...TH_TD_STYLE, padding: '2px 6px', borderLeft: 'none', borderRight: 'none', fontStyle: 'italic', color: '#333' }}><strong>{sub.name || "補充文字"}:</strong> <pre style={{ display: 'inline', whiteSpace: 'pre-wrap', margin: '0' }}>{sub.remarks}</pre></td>
-                        </tr>
-                    );
+    <tr key={sub.id + '-text'} className="sub-item-note">
+        <td colSpan="8" 
+            style={{ 
+                ...TH_TD_STYLE, 
+                padding: '2px 6px', 
+                borderLeft: 'none', 
+                borderRight: 'none', 
+                fontStyle: 'italic', 
+                color: '#333' 
+            }}>
+            <strong>{sub.name || "補充文字"}:</strong> 
+            <span style={{ whiteSpace: 'pre-wrap', margin: '0' }}>
+                {sub.remarks}
+            </span>
+        </td>
+    </tr>
+);
+
                 } else if (sub.type === 'image' && sub.imageUrl) {
                     // 補充圖片
                     rows.push(
@@ -1797,11 +1836,11 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                     <div className="print-notes-box" style={{ width: '100%', border: '1px solid black', padding: '10px' }}>
                         <div style={{ float: 'left', width: '48%', marginRight: '4%' }}>
                             <h3 style={{ fontSize: '14px', fontWeight: 'bold' }}>備註 (不含稅):</h3>
-                            <pre style={{ whiteSpace: 'pre-wrap', margin: '0', fontSize: '12px' }}>{quote.notes}</pre>
+                            <div style={{ whiteSpace: 'pre-wrap', margin: '0', fontSize: '12px' }}>{quote.notes}</div>
                         </div>
                         <div style={{ float: 'left', width: '48%' }}>
                             <h3 style={{ fontSize: '14px', fontWeight: 'bold' }}>付款條件:</h3>
-                            <pre style={{ whiteSpace: 'pre-wrap', margin: '0', fontSize: '12px' }}>{quote.payment}</pre>
+                            <div style={{ whiteSpace: 'pre-wrap', margin: '0', fontSize: '12px' }}>{quote.payment}</div>
                         </div>
                         <div style={{ clear: 'both' }}></div>
                     </div>
@@ -1876,11 +1915,12 @@ function App() {
 }
 
 // P6 — 啟動應用程式
-ReactDOM.render(
-    <AppProvider>
-        <App />
-    </AppProvider>,
-    document.getElementById("root")
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <AppProvider>
+    <App />
+  </AppProvider>
+);
 );
 </script>
 
