@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- V9</title>
+    <title>工程報價系統（Herhsin & SinChang）- V10</title>
 
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
@@ -805,12 +805,12 @@ function NoteSubItemBlock({ sub, updateField, deleteSubItem }) {
 // P4-3（X）SpecItemSuggest — 規格品自動建議元件
 function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
     
-    // 規格品欄位結構 - 統一使用 Google Sheet 欄位名稱
-    const FIELD_MAIN_SPEC = '規格'; 
-    const FIELD_MATERIAL_1 = '用料1'; 
-    const FIELD_MATERIAL_2 = '用料2'; 
-    const FIELD_MATERIAL_3 = '用料3'; 
-    const FIELD_REMARKS = '備註'; // 備註欄位
+    // 規格品欄位結構 - **V10 修正: 統一使用 Google Sheet 欄位名稱**
+    const FIELD_MAIN_SPEC = '品項說明'; // 🎯 修正: '規格' -> '品項說明'
+    const FIELD_MATERIAL_1 = '規格1';   // 🎯 修正: '用料1' -> '規格1'
+    const FIELD_MATERIAL_2 = '規格2';   // 🎯 修正: '用料2' -> '規格2'
+    const FIELD_MATERIAL_3 = '規格3';   // 🎯 修正: '用料3' -> '規格3'
+    const FIELD_REMARKS = '備註';       // 備註欄位
 
     // 搜尋結果
     const filteredItems = React.useMemo(() => {
@@ -823,7 +823,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
             .filter(item => 
                 // 確保 '品名' 欄位存在，且包含輸入的關鍵字
                 (item['品名'] && item['品名'].toLowerCase().includes(input)) ||
-                // 擴大篩選：'規格' (主描述) 也包含關鍵字
+                // 擴大篩選：'品項說明' (主描述) 也包含關鍵字
                 (item[FIELD_MAIN_SPEC] && item[FIELD_MAIN_SPEC].toLowerCase().includes(input))
             );
     }, [currentInput, specItems, FIELD_MAIN_SPEC]);
@@ -851,7 +851,7 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
                     {/* 顯示 品名, 規格, 單價，以利使用者區分 */}
                     <div className="font-semibold text-gray-800">{item['品名']}</div>
                     <div className="text-xs text-gray-600 truncate">
-                        規格: {item[FIELD_MAIN_SPEC] || '無主描述'} | 用料1: {item[FIELD_MATERIAL_1] || '無用料'} | 單價: {formatMoney(item['單價'])}
+                        規格: {item[FIELD_MAIN_SPEC] || '無主描述'} | 規格1: {item[FIELD_MATERIAL_1] || '無用料'} | 單價: {formatMoney(item['單價'])}
                     </div>
                 </div>
             ))}
@@ -864,12 +864,12 @@ function SpecItemSuggest({ currentInput, specItems, onSelect, onHide }) {
 function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
     const { specItems } = React.useContext(AppContext); 
     
-    // 規格品欄位結構
-    const FIELD_MAIN_SPEC = '規格'; 
-    const FIELD_MATERIAL_1 = '用料1'; 
-    const FIELD_MATERIAL_2 = '用料2'; 
-    const FIELD_MATERIAL_3 = '用料3'; 
-    const FIELD_REMARKS = '備註';
+    // 規格品欄位結構 - **V10 修正: 統一使用 Google Sheet 欄位名稱**
+    const FIELD_MAIN_SPEC = '品項說明'; // 🎯 修正: '規格' -> '品項說明'
+    const FIELD_MATERIAL_1 = '規格1';   // 🎯 修正: '用料1' -> '規格1'
+    const FIELD_MATERIAL_2 = '規格2';   // 🎯 修正: '用料2' -> '規格2'
+    const FIELD_MATERIAL_3 = '規格3';   // 🎯 修正: '用料3' -> '規格3'
+    const FIELD_REMARKS = '備註';       // 備註欄位
 
     const [showSuggest, setShowSuggest] = React.useState(false); 
 
@@ -887,7 +887,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
     // 🎯 處理規格品選擇 (修正備註/用料明細混淆問題)
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 🎯 修正點 1: 用料明細 - 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 🎯 修正點 1: 用料明細 - 確保只合併 '規格1', '規格2', '規格3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
@@ -900,7 +900,7 @@ function ItemSubItemBlock({ sub, updateField, deleteSubItem }) {
         updateField("name", spec['品名'] || sub.name);
         
         // 資料拆分精確對應欄位
-        updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格 (規格)
+        updateField("specMain", spec[FIELD_MAIN_SPEC] || ""); // 主規格 (品項說明)
         updateField("specMaterial", materialSpec); // 用料 1 2 3 合併 (用於顯示)
         
         // 🎯 修正點 2: 備註 - 確保使用規格品表格中的 '備註' 欄位
@@ -1115,13 +1115,13 @@ function SubItemWrapper({ subItem, parentItem, quote, updateQuote }) {
 function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index 屬性
     const { specItems } = React.useContext(AppContext);
     
-    // 規格品欄位結構
-    const FIELD_MAIN_SPEC = '規格'; 
-    const FIELD_MATERIAL_1 = '用料1'; 
-    const FIELD_MATERIAL_2 = '用料2'; 
-    const FIELD_MATERIAL_3 = '用料3'; 
-    const FIELD_REMARKS = '備註';
-    
+    // 規格品欄位結構 - **V10 修正: 統一使用 Google Sheet 欄位名稱**
+    const FIELD_MAIN_SPEC = '品項說明'; // 🎯 修正: '規格' -> '品項說明'
+    const FIELD_MATERIAL_1 = '規格1';   // 🎯 修正: '用料1' -> '規格1'
+    const FIELD_MATERIAL_2 = '規格2';   // 🎯 修正: '用料2' -> '規格2'
+    const FIELD_MATERIAL_3 = '規格3';   // 🎯 修正: '用料3' -> '規格3'
+    const FIELD_REMARKS = '備註';       // 備註欄位
+
     const [showSuggest, setShowSuggest] = React.useState(false); 
 
     // 1. 更新大項資料 
@@ -1172,7 +1172,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
     // 🎯 處理規格品選擇 (修正備註/用料明細混淆問題)
     const handleSelectSpecItem = React.useCallback((spec) => {
         
-        // 🎯 修正點 1: 用料明細 - 確保只合併 '用料1', '用料2', '用料3' 且濾除空值
+        // 🎯 修正點 1: 用料明細 - 確保只合併 '規格1', '規格2', '規格3' 且濾除空值
         const materialParts = [
             spec[FIELD_MATERIAL_1] || '',
             spec[FIELD_MATERIAL_2] || '',
@@ -1186,7 +1186,7 @@ function MainItemBlock({ item, quote, updateQuote, index }) { // 接收 index �
             name: spec['品名'] || item.name,
             
             // 資料拆分精確對應欄位
-            specMain: spec[FIELD_MAIN_SPEC] || "", // 主規格 (規格)
+            specMain: spec[FIELD_MAIN_SPEC] || "", // 主規格 (品項說明)
             specMaterial: materialSpec, // 用料 1 2 3 合併 (用於顯示)
             
             // 🎯 修正點 2: 備註 - 確保使用規格品表格中的 '備註' 欄位
