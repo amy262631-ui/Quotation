@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- V20 (最終修復 - 邏輯修正版)</title>
+    <title>工程報價系統（Herhsin & SinChang）- V21 (最終穩定版)</title>
 
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
-    
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
     
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -35,9 +34,7 @@
             display: none !important; 
         }
 
-        /* ----------------------------------------------- */
         /* 關鍵修正: 列印時，將預覽區設為全頁顯示 */
-        /* ----------------------------------------------- */
         #quotePreviewArea {
             display: block !important; 
             margin: 0;
@@ -61,9 +58,6 @@
             text-align: center; 
         }
 
-        /* ------------------------------------- */
-        /* 🎯 V20 修正點: 表格線條由內聯樣式處理，此處保留最小化樣式 */
-        /* ------------------------------------- */
         .print-info-table, table.print-items-table {
             width: 100%;
             border-collapse: collapse; /* 讓內聯樣式可以疊加邊框 */
@@ -123,9 +117,7 @@
         }
     }
     
-    /* ----------------------------------------------- */
     /* 確保非列印時，預覽區只在 App 底部顯示 */
-    /* ----------------------------------------------- */
     #quotePreviewArea {
         display: none; 
     }
@@ -275,7 +267,7 @@ function calcNegotiated(total, discountPercent, customPrice) {
     const cp = Number(customPrice || 0);
     const dp = Number(discountPercent || 0);
     
-    // 自定義價格優先 (如果有填寫，哪怕是 0 也會被優先處理，但通常使用者填寫是為了議價)
+    // 自定義價格優先
     if (cp > 0) return cp;
     
     // 折扣次之
@@ -322,7 +314,6 @@ async function loadCSV(url) {
 
         return rows.slice(1).map(row => {
             // 使用正規表達式處理 CSV 內嵌逗號和引號
-            // 這是更健壯的 CSV 解析方式
             const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
             const obj = {};
 
@@ -360,7 +351,6 @@ function AppProvider({ children }) {
     const [specItems, setSpecItems] = React.useState([]);
 
     // Google Sheet 路徑 (請務必將此替換為您的公開 CSV 連結)
-    // 範例連結：https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv
     const SPEC_CSV_URL =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv"; 
         
@@ -413,6 +403,8 @@ function AppProvider({ children }) {
         // 在建立報價單時，根據當前選定的 company 產生編號
         const newQuote = {
             id: uuid(),
+            // 確保 company 在建立時就存入 quote 物件，避免 PrintLayout 崩潰
+            company: company, 
             quoteNo: generateQuoteNo(company), 
             title: mode ? mode.name : "未命名工程",
             customerName: "",
@@ -525,7 +517,18 @@ function AppProvider({ children }) {
 // 公司切換（何鑫 / 薪昌）
 // --------------------------------------------------
 function CompanySelector() {
-    const { company, setCompany } = React.useContext(AppContext);
+    const { company, setCompany, activeQuote, updateQuote } = React.useContext(AppContext);
+    
+    // 處理公司切換時，也要同步更新 activeQuote 中的 company 欄位，避免 PrintLayout 崩潰
+    const handleSetCompany = (newCompany) => {
+        setCompany(newCompany);
+        if(activeQuote) {
+            updateQuote(activeQuote.id, { company: newCompany });
+            // 重新產生 QuoteNo 
+            updateQuote(activeQuote.id, { quoteNo: generateQuoteNo(newCompany) });
+        }
+    };
+
 
     return (
         <div className="mb-6 no-print">
@@ -538,7 +541,7 @@ function CompanySelector() {
                             ? "bg-blue-600 text-white"
                             : "bg-gray-300 hover:bg-gray-400"
                     }`}
-                    onClick={() => setCompany("herhsin")}
+                    onClick={() => handleSetCompany("herhsin")}
                 >
                     何鑫實業
                 </button>
@@ -549,7 +552,7 @@ function CompanySelector() {
                             ? "bg-blue-600 text-white"
                             : "bg-gray-300 hover:bg-gray-400"
                     }`}
-                    onClick={() => setCompany("sinchang")}
+                    onClick={() => handleSetCompany("sinchang")}
                 >
                     薪昌有限公司
                 </button>
@@ -720,7 +723,7 @@ function SpecItemSuggest({ item, updateItem, isSubItem = false }) {
     }, [searchTerm, specItems]);
 
     const handleSelectSpecItem = (specItem) => {
-        // 🎯 V20 修正點: 確保規格品的備註欄位被正確抓取並賦值
+        // V20 修正點: 確保規格品的備註欄位被正確抓取並賦值
         updateItem({
             name: specItem['品名'] || item.name,
             specMain: specItem['規格'] || item.specMain,
@@ -729,7 +732,7 @@ function SpecItemSuggest({ item, updateItem, isSubItem = false }) {
             unit: specItem['單位'] || item.unit,
             
             // ---------------------------------------------------
-            // 🎯 V20 關鍵修正 1: 抓取 Google Sheet 的 '備註' 欄位
+            // V20 關鍵修正 1: 抓取 Google Sheet 的 '備註' 欄位
             // ---------------------------------------------------
             remarks: specItem['備註'] || "" ,
             
@@ -904,7 +907,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                                     type="text"
                                     value={sub.name}
                                     onChange={(e) => handleUpdateSubItem(sub.id, { name: e.target.value })}
-                                    placeholder={isText ? "輸入補充文字" : "輸入圖片 URL"}
+                                    placeholder={isText ? "輸入補充文字標題" : "輸入圖片 URL"}
                                     className="w-full border p-1 rounded text-sm bg-yellow-50"
                                 />
                                 {isImage && sub.name && (
@@ -935,7 +938,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
                 </div>
                 
                 {/* 顯示用料明細 (僅 subItem type='item') */}
-                {isItem && item.specMaterial && (
+                {isItem && sub.specMaterial && (
                     <div className='text-xs text-gray-500 mt-1 pl-1'>
                         **用料明細:** {sub.specMaterial}
                     </div>
@@ -1276,6 +1279,7 @@ function QuoteEditor() {
             {/* 匯出/列印按鈕 */}
             <div className='mt-8 pt-4 border-t flex gap-4 justify-between'>
                 <ExportButton />
+                {/* 傳遞 quote 物件，確保 PrintButton 拿到的數據是完整的 */}
                 <PrintButton quote={activeQuote} totalAmount={totalAmount} negotiatedAmount={negotiatedAmount} />
             </div>
 
@@ -1307,7 +1311,9 @@ function ExportButton() {
             return;
         }
 
-        const quoteData = COMPANY_DATA[activeQuote.company];
+        // 🎯 V21 修正點 2: 處理 activeQuote.company 可能為空的情況
+        const companyKey = activeQuote.company || 'herhsin'; 
+        const quoteData = COMPANY_DATA[companyKey];
 
         // 整理表格數據
         const tableData = [];
@@ -1399,11 +1405,11 @@ function ExportButton() {
         // 總計金額數字格式
         const totalRowIndex = header.length + tableData.length + 1;
         const totalCellRef = 'G' + totalRowIndex;
-        ws[totalCellRef].z = '#,##0';
+        if(ws[totalCellRef]) ws[totalCellRef].z = '#,##0';
         
         const negotiatedRowIndex = totalRowIndex + 3;
         const negotiatedCellRef = 'G' + negotiatedRowIndex;
-        ws[negotiatedCellRef].z = '#,##0';
+        if(ws[negotiatedCellRef]) ws[negotiatedCellRef].z = '#,##0';
 
 
         // 創建工作簿
@@ -1431,18 +1437,23 @@ function ExportButton() {
 // --------------------------------------------------
 function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     
-    // 🎯 V20 關鍵修正 2: 重新檢查 ReactDOMServer 的可用性
+    // 檢查 ReactDOMServer 是否已載入
+    const isReactDOMServerAvailable = typeof ReactDOMServer !== 'undefined' && ReactDOMServer.renderToStaticMarkup;
+
     const handlePrint = () => {
         
-        // 檢查 ReactDOMServer 是否已載入
-        if (typeof ReactDOMServer === 'undefined' || !ReactDOMServer.renderToStaticMarkup) {
+        if (!isReactDOMServerAvailable) {
             alert('列印失敗：ReactDOMServer 模組尚未準備好。請稍候再試或檢查網頁是否載入完整。');
             return;
         }
         
+        if (!quote) {
+            alert('列印失敗：請先選擇或建立一份報價單。');
+            return;
+        }
+
         const printArea = document.getElementById('quotePreviewArea');
         
-        // 確保預覽區塊存在
         if (!printArea) {
             alert('列印失敗：報價單預覽尚未載入。請稍候幾秒再試一次。');
             return;
@@ -1457,7 +1468,16 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
         });
         
         // 使用靜態渲染生成 HTML 字串
-        const htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
+        // 這裡如果失敗，代表 ReactDOMServer 內部引用 React 核心失敗
+        let htmlContent;
+        try {
+             htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
+        } catch (e) {
+             console.error("ReactDOMServer 渲染失敗:", e);
+             alert(`列印渲染失敗: ${e.message}. 請檢查主控台錯誤。`);
+             return;
+        }
+       
 
         // 將 HTML 內容注入到預覽區
         printArea.innerHTML = htmlContent;
@@ -1476,7 +1496,7 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
         <button
             className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700"
             onClick={handlePrint}
-            disabled={!quote}
+            disabled={!quote || !isReactDOMServerAvailable}
         >
             列印報價單
         </button>
@@ -1488,6 +1508,19 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
 // 列印排版組件
 // --------------------------------------------------
 function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
+    
+    // 🎯 V21 關鍵修正 3: 防禦性檢查，防止在 quote 不存在時程式崩潰
+    if (!quote || !quote.company || !COMPANY_DATA[quote.company]) {
+        // 如果是編輯模式的預覽，顯示提示
+        if (isPreview) {
+            return <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                請選擇或新增報價單以顯示預覽
+            </div>;
+        }
+        // 如果是列印模式，回傳空內容防止崩潰
+        return null; 
+    }
+
     const companyInfo = COMPANY_DATA[quote.company];
     
     // 內聯樣式：確保表格線條 (用於覆蓋瀏覽器預設樣式)
@@ -1513,7 +1546,8 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
     // --------------------------------------------------
     const TotalSummary = () => {
         // 判斷是否有折扣或自定義價格
-        const hasDiscount = quote.discountPercent > 0 || quote.negotiatedPrice > 0;
+        // 只有 discountPercent > 0 或 negotiatedPrice > 0 時，才視為有折扣
+        const hasDiscount = Number(quote.discountPercent) > 0 || Number(quote.negotiatedPrice) > 0;
         
         // 總計金額 (原始總價)
         const totalDisplay = `NT$ ${formatMoney(totalAmount)}`;
@@ -1535,7 +1569,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                             </td>
                         </tr>
                         
-                        {/* 最終報價金額 (🎯 V20 關鍵修正 2: 有折扣或議價時才顯示) */}
+                        {/* 最終報價金額 (V20 關鍵修正: 有折扣或議價時才顯示) */}
                         {hasDiscount && (
                             <tr>
                                 <td style={{ ...TH_TD_STYLE, width: '60%', textAlign: 'right', fontWeight: 'bold', border: 'none' }}>
@@ -1800,7 +1834,6 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
 }
 
 
-
 // P5 — 應用程式根部
 function App() {
     return (
@@ -1820,6 +1853,7 @@ function App() {
 }
 
 // P6 — 啟動應用程式
+// 🎯 V21 警告處理: 雖然 React 18 建議使用 createRoot，但在單一 HTML 檔案中使用 Babel 轉譯器，render 是最簡單可靠的方式。
 ReactDOM.render(
     <AppProvider>
         <App />
