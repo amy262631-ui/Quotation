@@ -1509,19 +1509,18 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     }
 
     // 2. 確認 ReactDOMServer 是否可用（注意：這裡用的是「ReactDOMServer」不是 window.ReactDOMServer）
-    if (
-      typeof ReactDOMServer === "undefined" ||
-      typeof ReactDOMServer.renderToStaticMarkup !== "function"
-    ) {
-      console.log("ReactDOMServer 檢查：", ReactDOMServer);
-      alert(
-  "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
-  "請確認已在 index.html 中加入 ReactDOMServer CDN：\n" +
-  "https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js\n" +
-  "並且放在 <script type=\"text/babel\"> 之前。"
-     );
-     return;
-    }
+   if (
+  !window.ReactDOMServer ||
+  typeof window.window.ReactDOMServer.renderToStaticMarkup !== "function" ||
+  typeof window.ReactDOMServer.renderToString !== "function"
+) {
+  console.log("ReactDOMServer 檢查：", window.ReactDOMServer);
+  alert(
+    "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
+    "請確認已載入 CDN：https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js"
+  );
+  return;
+}
 
     // 3. 找到列印容器
     const printArea = document.getElementById("quotePreviewArea");
@@ -1544,7 +1543,7 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     // 5. 用 ReactDOMServer 轉成靜態 HTML
     let htmlContent = "";
     try {
-      htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
+      htmlContent = window.ReactDOMServer.renderToStaticMarkup(printComponent);
     } catch (e) {
       console.error("ReactDOMServer 渲染失敗:", e);
       alert("列印渲染失敗：" + e.message);
