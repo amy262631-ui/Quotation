@@ -790,184 +790,191 @@ function ExportPDFButton({ quote }) {
     );
 }
 /***************************************************
- * D7 — PrintLayout（A4 列印模板）
+ * D7 — PrintLayout（列印 / PDF 專用版）
  ***************************************************/
-function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
+function PrintLayout({ quote, companyData }) {
 
-    if (!quote) return null;
+    if (!quote) return <div>沒有資料</div>;
 
-    const company = COMPANY_DATA[quote.company] || COMPANY_DATA.herhsin;
+    const td = {
+        border: "1px solid #000",
+        padding: "4px",
+        fontSize: "13px",
+        verticalAlign: "top"
+    };
+
+    const tdCenter = { ...td, textAlign: "center" };
+    const tdRight = { ...td, textAlign: "right" };
+    const tdBold = { ...td, fontWeight: "bold" };
+    const tdRightBold = { ...tdRight, fontWeight: "bold" };
+
+    const totalAmount = calcTotal(quote.items);
+    const negotiatedAmount = calcNegotiated(
+        totalAmount,
+        quote.discountPercent,
+        quote.negotiatedPrice
+    );
 
     return (
-        <div style={{
-            width: "794px",   // A4 寬度 (px)
-            padding: "20px",
-            fontFamily: "Microsoft JhengHei",
-            color: "#000"
-        }}>
+        <div style={{ padding: "20px", fontFamily: "Microsoft JhengHei" }}>
 
-            {/* ======= 公司抬頭 ======= */}
-            <h1 style={{ fontSize: "28px", fontWeight: "bold", textAlign: "center" }}>
-                {company.name}
-            </h1>
-
-            <div style={{ textAlign: "center", marginBottom: "10px" }}>
-                電話：{company.tel}　地址：{company.address}
-            </div>
-
-            <h2 style={{
-                fontSize: "24px",
-                fontWeight: "bold",
-                textAlign: "center",
-                margin: "20px 0"
-            }}>
-                報　價　單
+            {/* ===== 報價單標題 ===== */}
+            <h2 style={{ fontSize: "22px", fontWeight: "bold", textAlign: "center", marginBottom: "10px" }}>
+                工程報價單
             </h2>
 
-            {/* ======= 客戶資料 ======= */}
-            <table style={{ width: "100%", fontSize: "14px", marginBottom: "15px" }}>
+            {/* ===== 基本資料 ===== */}
+            <table style={{ width: "100%", marginBottom: "10px" }}>
                 <tbody>
                     <tr>
-                        <td>客戶名稱：</td><td>{quote.customerName}</td>
-                        <td>聯絡人：</td><td>{quote.contact}</td>
-                    </tr>
-                    <tr>
-                        <td>電話：</td><td>{quote.phone}</td>
-                        <td>報價日期：</td><td>{quote.date}</td>
-                    </tr>
-                    <tr>
-                        <td>工程地址：</td>
-                        <td colSpan="3">{quote.location}</td>
-                    </tr>
-                    <tr>
-                        <td>報價單編號：</td>
-                        <td colSpan="3">{quote.quoteNo}</td>
+                        <td style={{ width: "50%" }}>
+                            <div><b>工程名稱：</b>{quote.title}</div>
+                            <div><b>客戶名稱：</b>{quote.customerName}</div>
+                            <div><b>連絡電話：</b>{quote.phone}</div>
+                            <div><b>安裝地點：</b>{quote.location}</div>
+                        </td>
+                        <td style={{ width: "50%" }}>
+                            <div><b>報價單號：</b>{quote.quoteNo}</div>
+                            <div><b>日期：</b>{quote.date}</div>
+                            <div><b>公司名稱：</b>{companyData.name}</div>
+                            <div><b>連絡電話：</b>{companyData.tel}</div>
+                        </td>
                     </tr>
                 </tbody>
             </table>
 
-            {/* ======= 報價明細 ======= */}
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+            {/* ===== 表格 ===== */}
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                     <tr>
-                        <th style={th}>項次</th>
-                        <th style={th}>品名</th>
-                        <th style={th}>規格 / 用料</th>
-                        <th style={th}>單位</th>
-                        <th style={th}>數量</th>
-                        <th style={th}>單價</th>
-                        <th style={th}>小計</th>
+                        <th style={tdCenter}>項次</th>
+                        <th style={tdCenter}>品名</th>
+                        <th style={tdCenter}>規格</th>
+                        <th style={tdCenter}>單位</th>
+                        <th style={tdCenter}>數量</th>
+                        <th style={tdCenter}>單價</th>
+                        <th style={tdCenter}>小計</th>
+                        <th style={tdCenter}>備註</th>
                     </tr>
                 </thead>
 
                 <tbody>
-                    {quote.items.map((item, idx) => {
 
-                        const subtotal = item.qty * item.price;
+                    {quote.items.map((item, idx) => {
+                        const sub = item.subItems || [];
+                        const amount = calcAmount(item);
 
                         return (
-                            <React.Fragment key={item.id}>
-
-                                {/* ===== 主項 ===== */}
-                                <tr>
+                            <>
+                                {/* ===== 主項次 ===== */}
+                                <tr key={item.id}>
                                     <td style={tdCenter}>{idx + 1}</td>
-                                    <td style={tdLeft}>{item.name}</td>
-
-                                    {/* ===== 規格 + 用料分行 ===== */}
-                                    <td style={tdLeft}>
-                                        {item.specMain}
-
-                                        {(item.specMaterial || item.specMaterial2 || item.specMaterial3) && (
-                                            <div style={{ marginTop: "4px", fontSize: "12px" }}>
-                                                <span>用料1：{item.specMaterial || "-"}</span>　
-                                                <span>用料2：{item.specMaterial2 || "-"}</span>　
-                                                <span>用料3：{item.specMaterial3 || "-"}</span>
-                                            </div>
-                                        )}
-                                    </td>
-
+                                    <td style={td}>{item.name}</td>
+                                    <td style={td}>{item.spec}</td>
                                     <td style={tdCenter}>{item.unit}</td>
                                     <td style={tdRight}>{item.qty}</td>
                                     <td style={tdRight}>{formatMoney(item.price)}</td>
-                                    <td style={tdRight}>{formatMoney(subtotal)}</td>
+                                    <td style={tdRightBold}>{formatMoney(amount)}</td>
+                                    <td style={td}>{item.remarks || ""}</td>
                                 </tr>
 
-                                {/* ===== 子項目（備註） ===== */}
-                                {item.subItems?.map(sub => {
-                                    if (sub.type === "note") {
-                                        return (
-                                            <tr key={sub.id + "_note"}>
-                                                <td colSpan="7" style={tdNote}>
-                                                    補充說明：{sub.text}
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
+                                {/* ===== 用料子項目 1-1 / 1-2 / 1-3 ===== */}
+                                {sub
+                                    .filter(s => s.type === "material")
+                                    .map((s, i) => (
+                                        <tr key={s.id}>
+                                            <td style={tdCenter}>{`${idx + 1}-${i + 1}`}</td>
+                                            <td colSpan="2" style={td}>用料：{s.name}</td>
+                                            <td style={tdCenter}>{s.unit}</td>
+                                            <td style={tdRight}>{s.qty}</td>
+                                            <td style={tdRight}>{formatMoney(s.price)}</td>
+                                            <td style={tdRightBold}>{formatMoney(calcAmount(s))}</td>
+                                            <td style={td}></td>
+                                        </tr>
+                                    ))}
 
-                                    if (sub.type === "image" && sub.url) {
-                                        return (
-                                            <tr key={sub.id + "_img"}>
-                                                <td colSpan="7" style={tdNote}>
-                                                    <img
-                                                        src={sub.url}
-                                                        style={{
-                                                            maxWidth: "500px",
-                                                            marginTop: "10px",
-                                                            border: "1px solid #ccc"
-                                                        }}
-                                                    />
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
-                                })}
-                            </React.Fragment>
+                                {/* ===== 補充說明（置中、整列） ===== */}
+                                {sub
+                                    .filter(s => s.type === "note")
+                                    .map(s => (
+                                        <tr key={s.id}>
+                                            <td colSpan="8" style={{ ...td, textAlign: "left" }}>
+                                                <b>補充說明：</b> {s.text}
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                {/* ===== 補充照片（置中顯示） ===== */}
+                                {sub
+                                    .filter(s => s.type === "image")
+                                    .map(s => (
+                                        <tr key={s.id}>
+                                            <td colSpan="8" style={{ ...td, textAlign: "center" }}>
+                                                <img
+                                                    src={s.url}
+                                                    style={{ maxWidth: "300px", margin: "10px auto" }}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                            </>
                         );
                     })}
 
-                    {/* 總計 */}
+                    {/* ===== 小計 ===== */}
                     <tr>
-                        <td colSpan="6" style={tdRightBold}>總計（未稅）</td>
+                        <td colSpan="7" style={tdRightBold}>總計（未稅）</td>
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
                     </tr>
 
+                    {/* ===== 議價後 ===== */}
                     <tr>
-                        <td colSpan="6" style={tdRightBold}>議價後總價（未稅）</td>
+                        <td colSpan="7" style={tdRightBold}>議價後總價（未稅）</td>
                         <td style={tdRightBold}>{formatMoney(negotiatedAmount)}</td>
                     </tr>
 
                 </tbody>
             </table>
 
-            {/* ======= 備註 ======= */}
-            <div style={{ marginTop: "30px", fontSize: "14px" }}>
-                <strong>備註：</strong>
-                <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px", marginTop: "5px" }}>
-{quote.notes}
-                </pre>
-            </div>
+            {/* ===== 備註 + 付款條件 ===== */}
+            <table style={{ width: "100%", marginTop: "20px" }}>
+                <tbody>
+                    <tr>
+                        <td style={{ width: "50%", verticalAlign: "top" }}>
+                            <b>備註：</b><br />
+                            <pre style={{ whiteSpace: "pre-wrap" }}>{quote.notes}</pre>
+                        </td>
 
-            {/* ======= 付款條件 ======= */}
-            <div style={{ marginTop: "20px", fontSize: "14px" }}>
-                <strong>付款條件：</strong>
-                <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px", marginTop: "5px" }}>
-{quote.payment}
-                </pre>
-            </div>
+                        <td style={{ width: "50%", verticalAlign: "top" }}>
+                            <b>付款條件：</b><br />
+                            <pre style={{ whiteSpace: "pre-wrap" }}>{quote.payment}</pre>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
-            {/* ======= 客戶回簽區 ======= */}
-            <div style={{ marginTop: "40px", fontSize: "14px", borderTop: "1px solid #000", paddingTop: "10px" }}>
-                <strong>客戶確認：</strong><br /><br />
-                客戶簽名：______________________　　日期：__________/__________/__________
-            </div>
+            {/* ===== 印章 + 客戶回簽 ===== */}
+            <table style={{ width: "100%", marginTop: "30px", borderCollapse: "collapse" }}>
+                <tbody>
+                    <tr>
+                        {/* 公司印章 */}
+                        <td style={{ ...td, height: "120px", textAlign: "center" }}>
+                            <div>本公司蓋章</div>
+                            <img
+                                src={companyData.stamp}
+                                style={{ width: "120px", marginTop: "10px" }}
+                            />
+                        </td>
 
-            {/* ======= 印章 ======= */}
-            <div style={{ marginTop: "30px", textAlign: "right" }}>
-                <img
-                    src={company.stamp}
-                    style={{ width: "180px", opacity: 0.9 }}
-                />
-            </div>
+                        {/* 客戶回簽 */}
+                        <td style={{ ...td, height: "120px", verticalAlign: "top" }}>
+                            客戶簽名：__________________________<br /><br />
+                            日期：______________________________
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
         </div>
     );
