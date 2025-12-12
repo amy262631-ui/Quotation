@@ -1353,15 +1353,12 @@ function QuoteEditor() {
 
         </div>
         
-        {/* ✨ 2. 隱藏的 PrintLayout - 專門用於列印 */}
-        {/* 這個 PrintLayout 必須在 DOM 中，但可以被隱藏，並被 ref 引用 */}
-        <div 
+             <div 
             ref={componentRef} 
             className="print-only-layout"
             // 列印時顯示，編輯時隱藏
             style={{ position: 'absolute', top: -9999, left: -9999 }} 
-        >
-             {/* 確保 PrintLayout 接收完整的數據，並設定 isPreview={false} */}
+        >        
             <PrintLayout 
                 quote={activeQuote} 
                 totalAmount={totalAmount} 
@@ -1369,6 +1366,7 @@ function QuoteEditor() {
                 isPreview={false}
             />
         </div>
+   </div>
     );
 }
 
