@@ -719,10 +719,11 @@ function PrintLayout({ quote, companyData }) {
                     </tr>
 
                     {/* ===== 議價後總價行 ===== */}
-                    <tr>
+                   <tr>
                         <td colSpan="7" style={tdRightBold}>議價後總價（未稅）</td>
-                        <td style={tdRightBold; color: '#d92c2c' }}>{formatMoney(negotiatedAmount)}</td>
-                    </tr>
+                        {/*  錯誤修正：使用 { ...tdRightBold, color: '#d92c2c' } */}
+                        <td style={{ ...tdRightBold, color: '#d92c2c' }}>{formatMoney(negotiatedAmount)}</td>
+                    </tr>>
 
                 </tbody>
             </table>
