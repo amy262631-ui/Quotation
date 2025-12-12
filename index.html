@@ -12,6 +12,7 @@
 
 <!-- 正確可用：ReactDOMServer (Browser UMD) -->
 <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.development.js"></script>
+<script src="https://unpkg.com/react-to-print/dist/index.umd.js"></script>    
 
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -523,13 +524,16 @@ function AppProvider({ children }) {
 function CompanySelector() {
     const { company, setCompany, activeQuote, updateQuote } = React.useContext(AppContext);
     
-    // 處理公司切換時，也要同步更新 activeQuote 中的 company 欄位，避免 PrintLayout 崩潰
+    // 處理公司切換時，也要同步更新 activeQuote 中的 company 欄位，並重新產生 QuoteNo
     const handleSetCompany = (newCompany) => {
         setCompany(newCompany);
         if(activeQuote) {
-            updateQuote(activeQuote.id, { company: newCompany });
-            // 重新產生 QuoteNo 
-            updateQuote(activeQuote.id, { quoteNo: generateQuoteNo(newCompany) });
+            // 由於 updateQuote 只能一次更新一個物件，為了保證邏輯順序，我們將 company 和 quoteNo 合併更新
+            // 這是為了避免多次 render 或潛在的競爭條件
+            updateQuote(activeQuote.id, { 
+                company: newCompany,
+                quoteNo: generateQuoteNo(newCompany) // 使用新的 newCompany 來產生編號
+            });
         }
     };
 
@@ -817,7 +821,8 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
         const newSub = {
             id: uuid(),
             type: type, // 'item', 'text', 'image'
-            name: type === 'text' ? '補充文字' : (type === 'image' ? '補充圖片' : ''), // V22: 主項目 name 設為空字串，方便輸入
+            // ✨ 修正邏輯：如果 type 是 'item'，預設 name 為空字串
+            name: type === 'item' ? '' : (type === 'text' ? '補充文字' : (type === 'image' ? '補充圖片' : '')), 
             specMain: "",
             unit: "式",
             qty: 1,
@@ -1095,7 +1100,7 @@ function QuoteItem({ item, index, updateItem, deleteItem, updateSubItem, deleteS
 }
 
 // --------------------------------------------------
-// 報價單編輯主元件
+// 報價單編輯主元件 (覆蓋開始)
 // --------------------------------------------------
 function QuoteEditor() {
     const { activeQuote, updateQuote } = React.useContext(AppContext);
@@ -1107,6 +1112,9 @@ function QuoteEditor() {
             </div>
         );
     }
+    
+    // ✨ 1. 創建一個 Ref，指向我們要列印的組件 (PrintLayout)
+    const componentRef = React.useRef(null);
     
     // 更新報價單基礎欄位
     const handleChange = (field, value) => {
@@ -1155,12 +1163,13 @@ function QuoteEditor() {
     );
 
     return (
+        // 編輯器介面 (加上 no-print 隱藏編輯元素)
         <div className="p-6 bg-gray-100 rounded-lg shadow-xl no-print">
             <h1 className="text-2xl font-bold mb-4 border-b pb-2">
                 編輯報價單: {activeQuote.title || "未命名"}
             </h1>
 
-            {/* 報價單資訊 */}
+            {/* 報價單資訊 (不變) */}
             <div className="bg-white p-4 rounded mb-6 grid grid-cols-2 gap-x-4 gap-y-2 text-sm shadow-inner">
                 
                 {/* 報價單編號 (不可編輯) */}
@@ -1278,7 +1287,7 @@ function QuoteEditor() {
 
             </div>
 
-            {/* 報價項目列表 */}
+            {/* 報價項目列表 (不變) */}
             <h2 className="text-xl font-bold mt-8 mb-4 border-b pb-2">報價項目列表</h2>
             
             <button 
@@ -1300,7 +1309,7 @@ function QuoteEditor() {
                 ))}
             </div>
 
-            {/* 備註與付款條件 */}
+            {/* 備註與付款條件 (不變) */}
             <div className="mt-8 grid grid-cols-2 gap-6">
                 <div>
                     <h3 className="font-bold mb-2">備註 (不含稅):</h3>
@@ -1322,14 +1331,19 @@ function QuoteEditor() {
                 </div>
             </div>
             
-            {/* 匯出/列印按鈕 */}
+            {/* 匯出/列印按鈕 - ✨ 傳遞 ref 到 PrintButton */}
             <div className='mt-8 pt-4 border-t flex gap-4 justify-between'>
                 <ExportButton />
-                {/* 傳遞 quote 物件，確保 PrintButton 拿到的數據是完整的 */}
-                <PrintButton quote={activeQuote} totalAmount={totalAmount} negotiatedAmount={negotiatedAmount} />
+                {/* 傳遞 componentRef 和所有必要的數據給 PrintButton */}
+                <PrintButton 
+                    quote={activeQuote} 
+                    totalAmount={totalAmount} 
+                    negotiatedAmount={negotiatedAmount}
+                    componentRef={componentRef} // ✨ 關鍵：傳遞 Ref
+                />
             </div>
 
-            {/* 預覽區 (編輯模式下的實時預覽) */}
+            {/* 預覽區 (編輯模式下的實時預覽) - 保持不變，因為這是編輯器的預覽 */}
             <div className='live-preview-box'>
                 <h3 className="text-center font-bold text-xl text-blue-700 mb-6">實時預覽區 (非列印尺寸)</h3>
                 <div className='print-page'>
@@ -1338,9 +1352,25 @@ function QuoteEditor() {
             </div>
 
         </div>
+        
+        {/* ✨ 2. 隱藏的 PrintLayout - 專門用於列印 */}
+        {/* 這個 PrintLayout 必須在 DOM 中，但可以被隱藏，並被 ref 引用 */}
+        <div 
+            ref={componentRef} 
+            className="print-only-layout"
+            // 列印時顯示，編輯時隱藏
+            style={{ position: 'absolute', top: -9999, left: -9999 }} 
+        >
+             {/* 確保 PrintLayout 接收完整的數據，並設定 isPreview={false} */}
+            <PrintLayout 
+                quote={activeQuote} 
+                totalAmount={totalAmount} 
+                negotiatedAmount={negotiatedAmount} 
+                isPreview={false}
+            />
+        </div>
     );
 }
-
 
 // P4-3 — 匯出 / 列印元件
 
@@ -1500,74 +1530,28 @@ function ExportButton() {
 }
 
 // --------------------------------------------------
-// 列印按鈕（最終穩定版）
+// PrintButton 組件 (修改建議)
 // --------------------------------------------------
-function PrintButton({ quote, totalAmount, negotiatedAmount }) {
+function PrintButton({ quote, totalAmount, negotiatedAmount, componentRef }) {
+    // 引用 react-to-print 的 hook
+    const useReactToPrint = window.ReactToPrint.useReactToPrint; 
 
-  const handlePrint = () => {
-    if (!quote) {
-      alert("請先選擇或建立一份報價單才能列印。");
-      return;
-    }
-
-    // 1️⃣ 正確檢查是否已載入 ReactDOMServer
-    if (
-      !window.ReactDOMServer ||
-      typeof window.ReactDOMServer.renderToStaticMarkup !== "function"
-    ) {
-      console.log("ReactDOMServer 檢查：", window.ReactDOMServer);
-      alert(
-        "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
-        "請確認 CDN 已正確載入，並放在 <script type=\"text/babel\"> 之前。"
-      );
-      return;
-    }
-
-    const printArea = document.getElementById("quotePreviewArea");
-    if (!printArea) {
-      alert("列印錯誤：找不到 quotePreviewArea 容器。");
-      return;
-    }
-
-    // 2️⃣ 建立 PrintLayout 元件
-    const printComponent = React.createElement(PrintLayout, {
-      quote,
-      totalAmount,
-      negotiatedAmount,
-      isPreview: false,
+    // 使用 useReactToPrint Hook 建立列印函式
+    const handlePrint = useReactToPrint({
+        // 使用傳入的 ref 來指向 PrintLayout
+        content: () => componentRef.current, 
+        documentTitle: `報價單_${quote?.clientName || '客戶'}_${quote?.quoteNo || ''}`,
+        pageStyle: '@page { size: A4; margin: 0; }',
     });
 
-    // 3️⃣ 用 ReactDOMServer 轉靜態 HTML（必須使用 window.）
-    let htmlContent = "";
-    try {
-      htmlContent = window.ReactDOMServer.renderToStaticMarkup(printComponent);
-    } catch (err) {
-      console.error("renderToStaticMarkup 錯誤：", err);
-      alert("列印渲染失敗：" + err.message);
-      return;
-    }
-
-    // 4️⃣ 將 HTML 放入列印容器
-    printArea.innerHTML = htmlContent;
-
-    // 5️⃣ 觸發列印
-    window.print();
-
-    // 6️⃣ 列印完成清空內容
-    setTimeout(() => {
-      printArea.innerHTML = "";
-    }, 200);
-  };
-
-  return (
-    <button
-      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-      onClick={handlePrint}
-      disabled={!quote}
-    >
-      列印報價單
-    </button>
-  );
+    return (
+        <button 
+            className="bg-red-800 text-white p-2 rounded hover:bg-red-700 transition"
+            onClick={handlePrint} // 點擊時執行 Hook 建立的列印函式
+        >
+            列印報價單
+        </button>
+    );
 }
 
 
