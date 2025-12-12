@@ -12,43 +12,28 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <!-- ReactDOMServer（pdf 用）-->
+    <!-- ReactDOMServer（PDF/列印用）-->
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js"></script>
 
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- XLSX for Excel export -->
+    <!-- XLSX for Excel export（如未使用可移除） -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <!-- FileSaver（PDF 下載用）-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
+    <!-- html2canvas（PDF 截圖用）-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
     body {
         font-family: "Microsoft JhengHei", sans-serif;
         background: #f4f4f4;
-    }
-
-    .live-preview-box {
-        border: 2px dashed #4aa3f0;
-        background: #fff;
-        padding: 20px;
-        margin-top: 30px;
-    }
-
-    .print-page {
-        max-width: 210mm;
-        margin: 0 auto;
-        background: white;
-        padding: 20px;
-        border: 1px solid #ccc;
-        transform: scale(0.9);
-        transform-origin: top center;
-    }
-
-    @media print {
-        .no-print { display: none !important; }
     }
 </style>
 </head>
@@ -97,30 +82,8 @@ function calcNegotiated(total, percent, customPrice) {
 }
 
 /***************************************************
- * D1 — Google Sheet Loader (讀取你的 CSV)
- ***************************************************/
-async function loadCSV(url) {
-    const res = await fetch(url);
-    const text = await res.text();
-
-    const rows = text.split("\n").map(r => r.trim()).filter(r => r.length);
-    const header = rows[0].split(",");
-
-    return rows.slice(1).map(row => {
-        const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-        const obj = {};
-        header.forEach((h, i) => {
-            let val = cols[i] || "";
-            val = val.replace(/^"|"$/g, "");
-            obj[h.trim()] = val.trim();
-        });
-        return obj;
-    });
-}
-/***************************************************
  * D2 — AppContext（公司資料 / 報價單資料中心）
  ***************************************************/
-
 const AppContext = React.createContext();
 
 /* 公司資料（含印章） */
@@ -158,25 +121,8 @@ const DEFAULT_PAYMENT = `訂金：40%
 製作完成：30%
 安裝完成：20%
 完工驗收：10%`;
-
-/* 報價單編號產生 */
-function generateQuoteNo(companyKey) {
-    const prefix = COMPANY_DATA[companyKey]?.prefix || "Q";
-    const d = new Date();
-    const datePart = [
-        d.getFullYear(),
-        String(d.getMonth() + 1).padStart(2, "0"),
-        String(d.getDate()).padStart(2, "0"),
-        String(d.getHours()).padStart(2, "0"),
-        String(d.getMinutes()).padStart(2, "0")
-    ].join("");
-
-    const random = Math.floor(1000 + Math.random() * 9000);
-    return `${prefix}${datePart}-${random}`;
-}
-
 /***************************************************
- * ▶ AppProvider（所有資料狀態管理）
+ * D2 — AppProvider（完整狀態管理：quotes + 公司切換 + specItems）
  ***************************************************/
 function AppProvider({ children }) {
 
@@ -184,7 +130,7 @@ function AppProvider({ children }) {
     const [quotes, setQuotes] = React.useState([]);
     const [activeQuoteId, setActiveQuoteId] = React.useState(null);
 
-    /* 規格品列表（來自 Google Sheet） */
+    /* Google Sheet 材料（Autocomplete 用） */
     const [specItems, setSpecItems] = React.useState([]);
 
     const SPEC_URL =
@@ -216,17 +162,41 @@ function AppProvider({ children }) {
     }, [quotes]);
 
     /***************************************************
-     * 載入 Google Sheet（規格品資料）
+     * 載入 Google Sheet（規格品資料 → specItems）
      ***************************************************/
     React.useEffect(() => {
-        loadCSV(SPEC_URL).then(list => {
-            console.log("📌 Google Sheet 已載入：", list);
-            setSpecItems(list);
-        });
+        async function loadSpec() {
+            try {
+                const res = await fetch(SPEC_URL);
+                const text = await res.text();
+
+                const rows = text.split("\n").map(r => r.trim()).filter(r => r.length);
+                const header = rows[0].split(",");
+
+                const list = rows.slice(1).map(row => {
+                    const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+                    const obj = {};
+                    header.forEach((h, i) => {
+                        let val = cols[i] || "";
+                        val = val.replace(/^"|"$/g, "");
+                        obj[h.trim()] = val.trim();
+                    });
+                    return obj;
+                });
+
+                console.log("📌 規格品已載入：", list);
+
+                setSpecItems(list);
+            } catch (err) {
+                console.error("Google Sheet 載入錯誤：", err);
+            }
+        }
+
+        loadSpec();
     }, []);
 
     /***************************************************
-     * 建立新報價單
+     * 新增報價單
      ***************************************************/
     const createQuote = () => {
         const newQuote = {
@@ -292,17 +262,18 @@ function AppProvider({ children }) {
         </AppContext.Provider>
     );
 }
+
 /***************************************************
  * D3 — 左側 UI：公司切換 + 報價單列表
  ***************************************************/
 
-/* ① 公司切換選單 */
+/* ① 公司切換 */
 function CompanySelector() {
     const { company, setCompany } = React.useContext(AppContext);
 
     return (
         <div className="mb-6 bg-white p-3 rounded shadow">
-            <h3 className="text-sm font-bold mb-2">選擇公司（影響印章＋編碼）</h3>
+            <h3 className="text-sm font-bold mb-2">選擇公司（編碼＋印章）</h3>
 
             <select
                 className="w-full border rounded p-2"
@@ -361,15 +332,10 @@ function QuoteList() {
                         <div className="flex justify-between items-center">
                             <div>
                                 <div className="font-bold text-sm">{q.title}</div>
-                                <div className="text-xs text-gray-500">
-                                    {q.quoteNo}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                    {q.date}
-                                </div>
+                                <div className="text-xs text-gray-500">{q.quoteNo}</div>
+                                <div className="text-xs text-gray-500">{q.date}</div>
                             </div>
 
-                            {/* 刪除按鈕 */}
                             <button
                                 className="text-red-600 text-xs hover:underline"
                                 onClick={(e) => {
@@ -389,96 +355,36 @@ function QuoteList() {
     );
 }
 /***************************************************
- * D4 — Google Sheet 自動載入材料資料 + Autocomplete
- * 你的欄位（完全依你提供的中文欄位名稱）：
- * 名稱、規格、單位、售價、用料1、用料2、用料3
+ * D4 — Autocomplete（使用 specItems）
  ***************************************************/
-
-// 🔧 Google Sheet 來源（你的 CSV 連結）
-const SHEET_URL =
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv";
-
-
-// ========= 全域資料存放 =========
-let SHEET_DATA = []; // 全部品名資料（23 筆）
-
-
-// ========= Step 1：載入 Google Sheet 資料 =========
-async function loadSheet() {
-    try {
-        const res = await fetch(SHEET_URL);
-        const text = await res.text();
-        const rows = text.split("\n").map(r => r.split(","));
-
-        const header = rows[0];
-        const body = rows.slice(1);
-
-        SHEET_DATA = body.map(r => {
-            const obj = {};
-            header.forEach((h, i) => (obj[h.trim()] = (r[i] || "").trim()));
-            return obj;
-        });
-
-        console.log("📌 Google Sheet 已載入：", SHEET_DATA);
-    } catch (e) {
-        console.error("Google Sheet 載入錯誤：", e);
-    }
-}
-
-// 一開始就載入
-loadSheet();
-
-
-/***************************************************
- * Step 2 — Autocomplete：依「名稱」模糊搜尋
- ***************************************************/
-function searchMaterial(keyword) {
-    if (!keyword) return [];
-
-    keyword = keyword.trim();
-
-    return SHEET_DATA.filter((row) =>
-        row["名稱"]?.includes(keyword)
-    );
-}
-
-
-/***************************************************
- * Step 3 — Autocomplete 下拉選單元件
- ***************************************************/
-function Autocomplete({ value, onSelect, onChange }) {
-    const [list, setList] = React.useState([]);
+function Autocomplete({ value, onChange, onSelect, list }) {
+    const [show, setShow] = React.useState(false);
 
     return (
         <div className="relative">
-            {/* 使用者輸入 */}
             <input
                 value={value}
                 onChange={(e) => {
-                    const v = e.target.value;
-                    onChange(v);
-                    setList(searchMaterial(v));
+                    onChange(e.target.value);
+                    setShow(true);
                 }}
-                className="w-full border p-2 rounded"
                 placeholder="輸入品名關鍵字…"
+                className="border p-2 rounded w-full"
             />
 
-            {/* 下拉清單 */}
-            {list.length > 0 && (
-                <div className="absolute left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-auto z-50">
-                    {list.map((item, idx) => (
+            {show && list.length > 0 && (
+                <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto z-50">
+                    {list.map((row, idx) => (
                         <div
                             key={idx}
                             className="p-2 hover:bg-blue-100 cursor-pointer text-sm"
                             onClick={() => {
-                                onSelect(item);
-                                setList([]);
+                                onSelect(row);
+                                setShow(false);
                             }}
                         >
-                            <div className="font-bold">{item["名稱"]}</div>
-                            <div className="text-gray-500 text-xs">
-                                {item["規格"]}
-                            </div>
+                            <div className="font-bold">{row["名稱"] || row["品名"]}</div>
+                            <div className="text-gray-500 text-xs">{row["規格"]}</div>
                         </div>
                     ))}
                 </div>
@@ -486,124 +392,283 @@ function Autocomplete({ value, onSelect, onChange }) {
         </div>
     );
 }
+
 /***************************************************
- * D5 — QuoteItem（大項編輯區）
- * 已整合：
- * ✔ Autocomplete（自動搜尋品名）
- * ✔ 選擇品名後自動帶出：
- *    → 規格（specMain）
- *    → 單位（unit）
- *    → 售價（price）
- *    → 用料1～3（加到 remarks 下方顯示）
+ * 搜尋材料（依品名模糊搜尋）
+ ***************************************************/
+function searchSpecItems(keyword, specItems) {
+    if (!keyword) return [];
+    const key = keyword.trim();
+    return specItems.filter(row =>
+        (row["名稱"] || row["品名"] || "").includes(key)
+    );
+}
+/***************************************************
+ * D8 — QuoteItem（最終保留版本）
  ***************************************************/
 function QuoteItem({ item, index, updateItem, deleteItem }) {
 
-    // 當使用者從 autocomplete 選擇品名
-    const handleSelectMaterial = (m) => {
+    const { specItems } = React.useContext(AppContext);
+
+    const [nameInput, setNameInput] = React.useState(item.name || "");
+    const [showList, setShowList] = React.useState(false);
+
+    /* 過濾出符合的材料 */
+    const matchList = React.useMemo(() => {
+        return searchSpecItems(nameInput, specItems);
+    }, [nameInput, specItems]);
+
+    /* 選擇 autocomplete 材料 → 自動帶入所有欄位 */
+    const selectSpec = (row) => {
         updateItem(item.id, {
-            name: m["名稱"] || "",
-            specMain: m["規格"] || "",
-            unit: m["單位"] || "",
-            price: Number(m["售價"] || 0),
-            material1: m["用料1"] || "",
-            material2: m["用料2"] || "",
-            material3: m["用料3"] || "",
+            name: row["名稱"] || row["品名"] || "",
+            specMain: row["規格"] || "",
+            unit: row["單位"] || "",
+            price: Number(row["售價"] || row["單價"] || 0),
+            specMaterial: row["用料1"] || "",
+            specMaterial2: row["用料2"] || "",
+            specMaterial3: row["用料3"] || "",
+        });
+
+        setNameInput(row["名稱"] || row["品名"] || "");
+        setShowList(false);
+    };
+
+    /* 新增子項 */
+    const addSubItem = (type) => {
+        const newSub = {
+            id: uuid(),
+            type,
+            text: "",
+            url: "",
+        };
+
+        updateItem(item.id, {
+            subItems: [...(item.subItems || []), newSub]
         });
     };
 
-    return (
-        <div className="bg-white p-4 rounded shadow border">
+    /* 更新子項 */
+    const updateSubItem = (subId, value) => {
+        const newList = (item.subItems || []).map(s =>
+            s.id === subId ? { ...s, ...value } : s
+        );
 
-            {/* ===== 大項標題列 ===== */}
+        updateItem(item.id, { subItems: newList });
+    };
+
+    /* 刪除子項 */
+    const deleteSubItem = (subId) => {
+        const list = (item.subItems || []).filter(s => s.id !== subId);
+        updateItem(item.id, { subItems: list });
+    };
+
+    return (
+        <div className="p-4 bg-white rounded shadow border mb-4">
+
+            {/* ===== 標題列 ===== */}
             <div className="flex justify-between items-center mb-3">
-                <div className="font-bold text-lg">項目 {index}</div>
+                <h3 className="text-lg font-bold">項目 {index}</h3>
+
                 <button
-                    className="text-red-600 hover:text-red-800"
+                    className="text-red-600 font-bold"
                     onClick={() => deleteItem(item.id)}
                 >
-                    刪除
+                    ✕ 刪除此項
                 </button>
             </div>
 
-            {/* ====== Autocomplete + 品名 ====== */}
-            <label className="font-semibold block mb-1">品名：</label>
-            <Autocomplete
-                value={item.name}
-                onChange={(v) => updateItem(item.id, { name: v })}
-                onSelect={(m) => handleSelectMaterial(m)}
-            />
+            {/* ===== 品名 + Autocomplete ===== */}
+            <div className="relative mb-3">
+                <label className="font-semibold">品名：</label>
 
-            {/* 若規格存在，顯示於下一行 */}
-            {item.specMain && (
-                <div className="mt-1 text-sm text-gray-600">
-                    <strong>規格：</strong> {item.specMain}
-                </div>
-            )}
+                <input
+                    value={nameInput}
+                    onChange={(e) => {
+                        setNameInput(e.target.value);
+                        updateItem(item.id, { name: e.target.value });
+                        setShowList(true);
+                    }}
+                    className="border w-full p-2 rounded"
+                    placeholder="輸入品名關鍵字…"
+                />
 
-            {/* 若用料存在，顯示於下一行 */}
-            {(item.material1 || item.material2 || item.material3) && (
-                <div className="mt-1 text-sm text-gray-600">
-                    <strong>用料明細：</strong>
-                    {[item.material1, item.material2, item.material3]
-                        .filter(Boolean)
-                        .join("、")}
-                </div>
-            )}
+                {showList && matchList.length > 0 && (
+                    <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto z-50">
+                        {matchList.map((row, idx) => (
+                            <div
+                                key={idx}
+                                className="p-2 hover:bg-blue-100 cursor-pointer"
+                                onClick={() => selectSpec(row)}
+                            >
+                                <div className="font-bold">
+                                    {row["名稱"] || row["品名"]}
+                                </div>
+                                <div className="text-gray-500 text-xs">
+                                    {row["規格"]}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
 
-            {/* ===== 數量 / 單位 / 單價 ===== */}
-            <div className="grid grid-cols-3 gap-3 mt-4">
+            {/* ===== 規格 ===== */}
+            <div className="mb-3">
+                <label className="font-semibold">規格：</label>
+                <input
+                    className="border p-2 rounded w-full"
+                    value={item.specMain}
+                    onChange={(e) => updateItem(item.id, { specMain: e.target.value })}
+                />
+            </div>
 
+            {/* ===== 用料 1~3 ===== */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
                 <div>
-                    <label className="font-semibold block mb-1">數量：</label>
+                    <label className="font-semibold">用料 1：</label>
                     <input
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) =>
-                            updateItem(item.id, { qty: Number(e.target.value) })
-                        }
-                        className="w-full border p-2 rounded"
+                        className="border p-2 rounded w-full"
+                        value={item.specMaterial}
+                        onChange={(e) => updateItem(item.id, { specMaterial: e.target.value })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold block mb-1">單位：</label>
+                    <label className="font-semibold">用料 2：</label>
                     <input
+                        className="border p-2 rounded w-full"
+                        value={item.specMaterial2}
+                        onChange={(e) => updateItem(item.id, { specMaterial2: e.target.value })}
+                    />
+                </div>
+
+                <div>
+                    <label className="font-semibold">用料 3：</label>
+                    <input
+                        className="border p-2 rounded w-full"
+                        value={item.specMaterial3}
+                        onChange={(e) => updateItem(item.id, { specMaterial3: e.target.value })}
+                    />
+                </div>
+            </div>
+
+            {/* ===== 單位 / 數量 / 單價 ===== */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label className="font-semibold">單位：</label>
+                    <input
+                        className="border p-2 rounded w-full"
                         value={item.unit}
-                        onChange={(e) =>
-                            updateItem(item.id, { unit: e.target.value })
-                        }
-                        className="w-full border p-2 rounded"
+                        onChange={(e) => updateItem(item.id, { unit: e.target.value })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold block mb-1">單價：</label>
+                    <label className="font-semibold">數量：</label>
                     <input
                         type="number"
+                        className="border p-2 rounded w-full"
+                        value={item.qty}
+                        onChange={(e) => updateItem(item.id, { qty: Number(e.target.value) })}
+                    />
+                </div>
+
+                <div>
+                    <label className="font-semibold">單價：</label>
+                    <input
+                        type="number"
+                        className="border p-2 rounded w-full"
                         value={item.price}
-                        onChange={(e) =>
-                            updateItem(item.id, { price: Number(e.target.value) })
-                        }
-                        className="w-full border p-2 rounded"
+                        onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
                     />
                 </div>
             </div>
 
             {/* ===== 備註 ===== */}
-            <div className="mt-4">
-                <label className="font-semibold block mb-1">備註：</label>
+            <div className="mb-4">
+                <label className="font-semibold">備註：</label>
                 <textarea
-                    rows="2"
+                    className="border p-2 rounded w-full"
                     value={item.remarks}
-                    onChange={(e) =>
-                        updateItem(item.id, { remarks: e.target.value })
-                    }
-                    className="w-full border p-2 rounded"
-                />
+                    onChange={(e) => updateItem(item.id, { remarks: e.target.value })}
+                ></textarea>
+            </div>
+
+            {/* ===== 子項目列表 ===== */}
+            <div className="space-y-3 mb-4">
+                {(item.subItems || []).map((sub) => (
+                    <div key={sub.id} className="p-3 border rounded bg-gray-50">
+
+                        {/* 補充文字 */}
+                        {sub.type === "note" && (
+                            <>
+                                <label className="font-semibold">補充文字：</label>
+                                <textarea
+                                    className="border p-2 rounded w-full"
+                                    value={sub.text}
+                                    onChange={(e) =>
+                                        updateSubItem(sub.id, { text: e.target.value })
+                                    }
+                                ></textarea>
+                            </>
+                        )}
+
+                        {/* 補充圖片 */}
+                        {sub.type === "image" && (
+                            <>
+                                <label className="font-semibold">補充圖片：</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const url = URL.createObjectURL(file);
+                                            updateSubItem(sub.id, { url });
+                                        }
+                                    }}
+                                />
+
+                                {sub.url && (
+                                    <img
+                                        src={sub.url}
+                                        className="mt-2 rounded border"
+                                        style={{ maxWidth: "260px" }}
+                                    />
+                                )}
+                            </>
+                        )}
+
+                        <button
+                            className="text-red-600 mt-2"
+                            onClick={() => deleteSubItem(sub.id)}
+                        >
+                            刪除子項
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            {/* ===== 新增子項按鈕 ===== */}
+            <div className="flex gap-3">
+                <button
+                    className="px-3 py-1 bg-blue-600 text-white rounded"
+                    onClick={() => addSubItem("note")}
+                >
+                    ＋ 補充文字
+                </button>
+
+                <button
+                    className="px-3 py-1 bg-green-600 text-white rounded"
+                    onClick={() => addSubItem("image")}
+                >
+                    ＋ 補充圖片
+                </button>
             </div>
 
             {/* ===== 小計 ===== */}
-            <div className="mt-3 text-right font-bold text-blue-700">
+            <div className="text-right font-bold text-blue-700 mt-4">
                 小計：NT$ {formatMoney(item.qty * item.price)}
             </div>
         </div>
@@ -620,7 +685,6 @@ function PrintButton({ quote }) {
             return;
         }
 
-        // 以 ReactDOMServer 產生 HTML
         const html = ReactDOMServer.renderToString(
             <PrintLayout
                 quote={quote}
@@ -633,8 +697,8 @@ function PrintButton({ quote }) {
             />
         );
 
-        // 新視窗載入排版用 CSS + 報價單 HTML
         const win = window.open("", "_blank");
+
         win.document.write(`
             <html>
             <head>
@@ -643,7 +707,7 @@ function PrintButton({ quote }) {
                     body { font-family: "Microsoft JhengHei"; padding: 20px; }
                     table { width: 100%; border-collapse: collapse; }
                     th, td { border: 1px solid black; padding: 6px; }
-                    .stamp { width: 140px; margin-top: 10px; }
+                    .stamp { width: 160px; }
                 </style>
             </head>
             <body>${html}</body>
@@ -666,8 +730,7 @@ function PrintButton({ quote }) {
 }
 
 /***************************************************
- * D6 — 產生 PDF 的按鈕（使用 html2canvas + jsPDF）
- * 按鈕：📄 轉 PDF
+ * D6 — 產生 PDF（使用 html2canvas + jsPDF）
  ***************************************************/
 function ExportPDFButton({ quote }) {
 
@@ -677,9 +740,8 @@ function ExportPDFButton({ quote }) {
             return;
         }
 
-        const element = document.createElement("div");
+        const container = document.createElement("div");
 
-        // 使用 PrintLayout 生成報價內容
         const html = ReactDOMServer.renderToString(
             <PrintLayout
                 quote={quote}
@@ -692,14 +754,10 @@ function ExportPDFButton({ quote }) {
             />
         );
 
-        element.innerHTML = html;
-        document.body.appendChild(element);
+        container.innerHTML = html;
+        document.body.appendChild(container);
 
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-        });
-
+        const canvas = await html2canvas(container, { scale: 2, useCORS: true });
         const imgData = canvas.toDataURL("image/png");
 
         const pdf = new jspdf.jsPDF("p", "mm", "a4");
@@ -709,7 +767,7 @@ function ExportPDFButton({ quote }) {
         pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
         pdf.save(`報價單_${quote.quoteNo}.pdf`);
 
-        document.body.removeChild(element);
+        document.body.removeChild(container);
     };
 
     return (
@@ -721,60 +779,59 @@ function ExportPDFButton({ quote }) {
         </button>
     );
 }
+
 /***************************************************
- * D7 — PrintLayout（A4 列印模板 + 印章 + 用料 + 子項目）
+ * D7 — PrintLayout（A4 列印模板）
  ***************************************************/
 function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
-
     if (!quote) return null;
 
     const company = COMPANY_DATA[quote.company] || COMPANY_DATA.herhsin;
 
     return (
         <div style={{
-            width: "794px",   // A4 寬 px
-            padding: "20px",
+            width: "760px",
             fontFamily: "Microsoft JhengHei",
+            padding: "20px",
             color: "#000"
         }}>
 
-            {/* ======== 公司抬頭 ======== */}
-            <h1 style={{ fontSize: "28px", fontWeight: "bold", textAlign: "center" }}>
+            {/* ===== 公司抬頭 ===== */}
+            <h1 style={{ fontSize: "26px", fontWeight: "bold", textAlign: "center" }}>
                 {company.name}
             </h1>
 
-            <div style={{ textAlign: "center", marginBottom: "10px" }}>
-                統編：未填 • 電話：{company.tel} • 傳真：{company.fax}<br />
-                地址：{company.address}
+            <div style={{ textAlign: "center", marginBottom: "12px" }}>
+                電話：{company.tel}　地址：{company.address}
             </div>
 
             <h2 style={{
-                fontSize: "24px",
-                fontWeight: "bold",
+                fontSize: "22px",
                 textAlign: "center",
-                margin: "20px 0"
+                margin: "15px 0",
+                fontWeight: "bold"
             }}>
-                報 價 單
+                報　價　單
             </h2>
 
-            {/* ======== 客戶資料 ======== */}
-            <table style={{ width: "100%", fontSize: "15px", marginBottom: "15px" }}>
+            {/* ===== 客戶資料 ===== */}
+            <table style={{ width: "100%", marginBottom: "16px" }}>
                 <tbody>
                     <tr>
                         <td>客戶名稱：</td>
-                        <td>{quote.customerName || ""}</td>
+                        <td>{quote.customerName}</td>
                         <td>聯絡人：</td>
-                        <td>{quote.contact || ""}</td>
+                        <td>{quote.contact}</td>
                     </tr>
                     <tr>
                         <td>電話：</td>
-                        <td>{quote.phone || ""}</td>
+                        <td>{quote.phone}</td>
                         <td>報價日期：</td>
-                        <td>{quote.date || ""}</td>
+                        <td>{quote.date}</td>
                     </tr>
                     <tr>
                         <td>工程地點：</td>
-                        <td colSpan="3">{quote.location || ""}</td>
+                        <td colSpan="3">{quote.location}</td>
                     </tr>
                     <tr>
                         <td>報價單編號：</td>
@@ -783,13 +840,13 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                 </tbody>
             </table>
 
-            {/* =================== 報價項目表 =================== */}
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+            {/* ===== 報價明細 ===== */}
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                     <tr>
                         <th style={th}>項次</th>
                         <th style={th}>品名</th>
-                        <th style={th}>規格</th>
+                        <th style={th}>規格 / 用料</th>
                         <th style={th}>單位</th>
                         <th style={th}>數量</th>
                         <th style={th}>單價</th>
@@ -798,36 +855,32 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                 </thead>
 
                 <tbody>
-
                     {quote.items.map((item, idx) => {
-
                         const subtotal = item.qty * item.price;
 
                         return (
                             <React.Fragment key={item.id}>
 
-                                {/* ======== 主項目 ======== */}
+                                {/* === 主項 === */}
                                 <tr>
                                     <td style={tdCenter}>{idx + 1}</td>
                                     <td style={tdLeft}>{item.name}</td>
 
-                                    {/* 規格 + 用料 */}
                                     <td style={tdLeft}>
                                         {item.specMain}
 
-                                        {/* 用料有填才顯示 */}
                                         {item.specMaterial && (
-                                            <div style={{ fontSize: "12px", color: "#444" }}>
-                                                用料：{item.specMaterial}
+                                            <div style={{ fontSize: "12px" }}>
+                                                用料1：{item.specMaterial}
                                             </div>
                                         )}
                                         {item.specMaterial2 && (
-                                            <div style={{ fontSize: "12px", color: "#444" }}>
+                                            <div style={{ fontSize: "12px" }}>
                                                 用料2：{item.specMaterial2}
                                             </div>
                                         )}
                                         {item.specMaterial3 && (
-                                            <div style={{ fontSize: "12px", color: "#444" }}>
+                                            <div style={{ fontSize: "12px" }}>
                                                 用料3：{item.specMaterial3}
                                             </div>
                                         )}
@@ -839,9 +892,8 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                                     <td style={tdRight}>{formatMoney(subtotal)}</td>
                                 </tr>
 
-                                {/* ======== 子項目：備註 ======== */}
-                                {item.subItems?.map((sub) => {
-
+                                {/* === 子項：備註 === */}
+                                {(item.subItems || []).map((sub) => {
                                     if (sub.type === "note") {
                                         return (
                                             <tr key={sub.id + "-note"}>
@@ -852,17 +904,16 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                                         );
                                     }
 
-                                    /* ======== 子項目：補充圖片 ======== */
                                     if (sub.type === "image" && sub.url) {
                                         return (
                                             <tr key={sub.id + "-img"}>
                                                 <td colSpan="7" style={tdNote}>
-                                                    <strong>補充圖片：</strong><br />
+                                                    <div>補充圖片：</div>
                                                     <img
                                                         src={sub.url}
                                                         style={{
-                                                            maxWidth: "350px",
-                                                            marginTop: "6px",
+                                                            maxWidth: "300px",
+                                                            marginTop: "8px",
                                                             border: "1px solid #999"
                                                         }}
                                                     />
@@ -870,6 +921,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                                             </tr>
                                         );
                                     }
+                                    return null;
                                 })}
 
                             </React.Fragment>
@@ -882,33 +934,31 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
                     </tr>
 
+                    {/* 議價後總價 */}
                     <tr>
                         <td colSpan="6" style={tdRightBold}>議價後總價（未稅）</td>
                         <td style={tdRightBold}>{formatMoney(negotiatedAmount)}</td>
                     </tr>
-
                 </tbody>
             </table>
 
-            {/* ======== 備註 + 印章 ======== */}
-            <div style={{ marginTop: "30px", fontSize: "14px" }}>
-                <strong>備註：</strong><br />
-                <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px" }}>
-                    {quote.notes}
-                </pre>
+            {/* ===== 備註 ===== */}
+            <div style={{ marginTop: "20px", fontSize: "14px" }}>
+                <strong>備註：</strong>
+                <pre style={{ whiteSpace: "pre-wrap" }}>{quote.notes}</pre>
             </div>
 
+            {/* ===== 章戳 ===== */}
             <div style={{ marginTop: "20px", textAlign: "right" }}>
-                <img
-                    src={company.stamp}
-                    style={{ width: "180px", opacity: 0.95 }}
-                />
+                <img src={company.stamp} className="stamp" />
             </div>
         </div>
     );
 }
 
-/************** 使用的表格樣式 **************/
+/***************************************************
+ * 表格樣式（列印專用）
+ ***************************************************/
 const th = {
     border: "1px solid black",
     padding: "6px",
@@ -948,270 +998,241 @@ const tdNote = {
     fontSize: "13px"
 };
 /***************************************************
- * D8 — QuoteItem（含：Autocomplete、自動帶資料、用料1~3、子項目備註＋圖片）
+ * D9 — 主 App 畫面（右側編輯區）
  ***************************************************/
-function QuoteItem({ item, index, updateItem, deleteItem }) {
+function App() {
+    const {
+        activeQuote,
+        activeQuoteId,
+        updateQuote,
+    } = React.useContext(AppContext);
 
-    const { sheetData } = React.useContext(AppContext);
+    /* 新增一個項目 */
+    const addItem = () => {
+        if (!activeQuote) return;
 
-    const [nameInput, setNameInput] = React.useState(item.name || "");
-    const [showList, setShowList] = React.useState(false);
-
-    const matchList = React.useMemo(() => {
-        if (!nameInput) return [];
-        return sheetData.filter(row =>
-            row.品名 && row.品名.includes(nameInput)
-        );
-    }, [nameInput, sheetData]);
-
-    /* 選擇 autocomplete 品名 → 自動帶入所有欄位 */
-    const selectItem = (row) => {
-        updateItem(item.id, {
-            name: row.品名,
-            specMain: row.規格 || "",
-            unit: row.單位 || "",
-            price: Number(row.單價 || 0),
-            specMaterial: row.用料1 || "",
-            specMaterial2: row.用料2 || "",
-            specMaterial3: row.用料3 || "",
-        });
-        setNameInput(row.品名);
-        setShowList(false);
-    };
-
-    /* 新增子項目 */
-    const addSubItem = (type) => {
-        const newSub = {
+        const newItem = {
             id: uuid(),
-            type,
-            text: "",
-            url: "",
+            name: "",
+            specMain: "",
+            specMaterial: "",
+            specMaterial2: "",
+            specMaterial3: "",
+            unit: "",
+            qty: 1,
+            price: 0,
+            remarks: "",
+            subItems: []
         };
-        updateItem(item.id, {
-            subItems: [...(item.subItems || []), newSub]
+
+        updateQuote(activeQuoteId, {
+            items: [...activeQuote.items, newItem]
         });
     };
 
-    /* 更新子項目 */
-    const updateSubItem = (subId, value) => {
-        const newList = item.subItems.map(s =>
-            s.id === subId ? { ...s, ...value } : s
+    /* 更新單一 item */
+    const updateItem = (id, value) => {
+        const list = activeQuote.items.map(i =>
+            i.id === id ? { ...i, ...value } : i
         );
-        updateItem(item.id, { subItems: newList });
+        updateQuote(activeQuoteId, { items: list });
     };
 
-    /* 刪除子項 */
-    const deleteSubItem = (subId) => {
-        const list = item.subItems.filter(s => s.id !== subId);
-        updateItem(item.id, { subItems: list });
+    /* 刪除 item */
+    const deleteItem = (id) => {
+        const list = activeQuote.items.filter(i => i.id !== id);
+        updateQuote(activeQuoteId, { items: list });
     };
+
+    if (!activeQuote) {
+        return (
+            <div className="p-6 text-gray-600">
+                尚未選擇報價單，請由左側列表新增或選取。
+            </div>
+        );
+    }
 
     return (
-        <div className="p-4 bg-white rounded shadow">
+        <div className="p-6 space-y-6">
 
-            {/* ====== 標題行 ====== */}
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-lg">項目 {index}</h3>
-                <button
-                    className="text-red-600 font-bold"
-                    onClick={() => deleteItem(item.id)}
-                >
-                    ✕ 刪除此項
-                </button>
-            </div>
-
-            {/* ====== 品名 + 自動完成 ====== */}
-            <div className="relative mb-3">
-                <label className="font-semibold">品名：</label>
-                <input
-                    value={nameInput}
-                    onChange={(e) => {
-                        setNameInput(e.target.value);
-                        setShowList(true);
-                        updateItem(item.id, { name: e.target.value });
-                    }}
-                    className="border w-full p-2 rounded"
-                    placeholder="輸入品名（自動帶出 Google Sheet 資料）"
-                />
-
-                {/* Autocomplete 下拉 */}
-                {showList && matchList.length > 0 && (
-                    <div className="absolute bg-white border w-full max-h-48 overflow-y-auto z-20">
-                        {matchList.map((row, idx) => (
-                            <div
-                                key={idx}
-                                className="p-2 hover:bg-blue-100 cursor-pointer"
-                                onClick={() => selectItem(row)}
-                            >
-                                {row.品名}（{row.規格}）
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* ====== 規格 ====== */}
-            <div className="mb-2">
-                <label className="font-semibold">規格：</label>
+            {/* ===== 工程名稱 ===== */}
+            <div>
+                <label className="font-semibold">工程名稱：</label>
                 <input
                     className="border p-2 rounded w-full"
-                    value={item.specMain}
-                    onChange={(e) => updateItem(item.id, { specMain: e.target.value })}
+                    value={activeQuote.title}
+                    onChange={(e) =>
+                        updateQuote(activeQuoteId, { title: e.target.value })
+                    }
                 />
             </div>
 
-            {/* ====== 用料 1~3 ====== */}
-            <div className="grid grid-cols-3 gap-3 mb-3">
+            {/* ===== 客戶欄位 ===== */}
+            <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="font-semibold">用料 1：</label>
+                    <label className="font-semibold">客戶名稱：</label>
                     <input
-                        value={item.specMaterial}
-                        onChange={(e) => updateItem(item.id, { specMaterial: e.target.value })}
                         className="border p-2 rounded w-full"
+                        value={activeQuote.customerName}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, { customerName: e.target.value })
+                        }
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">用料 2：</label>
+                    <label className="font-semibold">聯絡人：</label>
                     <input
-                        value={item.specMaterial2}
-                        onChange={(e) => updateItem(item.id, { specMaterial2: e.target.value })}
                         className="border p-2 rounded w-full"
+                        value={activeQuote.contact}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, { contact: e.target.value })
+                        }
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">用料 3：</label>
-                    <input
-                        value={item.specMaterial3}
-                        onChange={(e) => updateItem(item.id, { specMaterial3: e.target.value })}
-                        className="border p-2 rounded w-full"
-                    />
-                </div>
-            </div>
-
-            {/* ====== 單位 / 數量 / 單價 ====== */}
-            <div className="grid grid-cols-3 gap-3 mb-3">
-                <div>
-                    <label className="font-semibold">單位：</label>
+                    <label className="font-semibold">電話：</label>
                     <input
                         className="border p-2 rounded w-full"
-                        value={item.unit}
-                        onChange={(e) => updateItem(item.id, { unit: e.target.value })}
+                        value={activeQuote.phone}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, { phone: e.target.value })
+                        }
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">數量：</label>
+                    <label className="font-semibold">日期：</label>
                     <input
-                        type="number"
+                        type="date"
                         className="border p-2 rounded w-full"
-                        value={item.qty}
-                        onChange={(e) => updateItem(item.id, { qty: Number(e.target.value) })}
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold">單價：</label>
-                    <input
-                        type="number"
-                        className="border p-2 rounded w-full"
-                        value={item.price}
-                        onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
+                        value={activeQuote.date}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, { date: e.target.value })
+                        }
                     />
                 </div>
             </div>
 
-            {/* ====== 備註 ====== */}
-            <div className="mb-3">
-                <label className="font-semibold">備註：</label>
-                <textarea
-                    className="border w-full p-2 rounded"
-                    value={item.remarks}
-                    onChange={(e) => updateItem(item.id, { remarks: e.target.value })}
+            {/* ===== 工程地點 ===== */}
+            <div>
+                <label className="font-semibold">工程地點：</label>
+                <input
+                    className="border p-2 rounded w-full"
+                    value={activeQuote.location}
+                    onChange={(e) =>
+                        updateQuote(activeQuoteId, { location: e.target.value })
+                    }
                 />
             </div>
 
-            {/* ====== 子項目列表 ====== */}
-            <div className="mt-4 space-y-3">
-                {item.subItems?.map((sub) => (
-                    <div key={sub.id} className="p-3 border rounded bg-gray-50">
+            {/* ===== 新增項目按鈕 ===== */}
+            <button
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                onClick={addItem}
+            >
+                ＋ 新增項目
+            </button>
 
-                        {/* --- 備註子項 --- */}
-                        {sub.type === "note" && (
-                            <div>
-                                <label className="font-semibold">補充文字：</label>
-                                <textarea
-                                    className="border p-2 rounded w-full"
-                                    value={sub.text}
-                                    onChange={(e) =>
-                                        updateSubItem(sub.id, { text: e.target.value })
-                                    }
-                                />
-                            </div>
-                        )}
-
-                        {/* --- 圖片子項 --- */}
-                        {sub.type === "image" && (
-                            <div>
-                                <label className="font-semibold">補充圖片：</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            const url = URL.createObjectURL(file);
-                                            updateSubItem(sub.id, { url });
-                                        }
-                                    }}
-                                />
-
-                                {sub.url && (
-                                    <img
-                                        src={sub.url}
-                                        className="mt-2"
-                                        style={{ maxWidth: "250px" }}
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        <button
-                            className="text-red-600 mt-2"
-                            onClick={() => deleteSubItem(sub.id)}
-                        >
-                            刪除子項
-                        </button>
-                    </div>
+            {/* ===== 所有項目 ===== */}
+            <div className="space-y-4">
+                {activeQuote.items.map((item, i) => (
+                    <QuoteItem
+                        key={item.id}
+                        item={item}
+                        index={i + 1}
+                        updateItem={updateItem}
+                        deleteItem={deleteItem}
+                    />
                 ))}
             </div>
 
-            {/* ====== 新增子項目按鈕 ====== */}
-            <div className="mt-3 flex gap-4">
-                <button
-                    className="px-3 py-1 bg-blue-600 text-white rounded"
-                    onClick={() => addSubItem("note")}
-                >
-                    ＋ 補充文字
-                </button>
+            {/* ===== 議價相關 ===== */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="font-semibold">折扣（%）：</label>
+                    <input
+                        type="number"
+                        className="border p-2 rounded w-full"
+                        value={activeQuote.discountPercent}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, {
+                                discountPercent: Number(e.target.value),
+                            })
+                        }
+                    />
+                </div>
 
-                <button
-                    className="px-3 py-1 bg-green-600 text-white rounded"
-                    onClick={() => addSubItem("image")}
-                >
-                    ＋ 補充圖片
-                </button>
+                <div>
+                    <label className="font-semibold">議價後總價（直接輸入金額）：</label>
+                    <input
+                        type="number"
+                        className="border p-2 rounded w-full"
+                        value={activeQuote.negotiatedPrice}
+                        onChange={(e) =>
+                            updateQuote(activeQuoteId, {
+                                negotiatedPrice: Number(e.target.value),
+                            })
+                        }
+                    />
+                </div>
             </div>
 
+            {/* ===== 備註 ===== */}
+            <div>
+                <label className="font-semibold">備註：</label>
+                <textarea
+                    className="border p-2 rounded w-full"
+                    rows="4"
+                    value={activeQuote.notes}
+                    onChange={(e) =>
+                        updateQuote(activeQuoteId, { notes: e.target.value })
+                    }
+                ></textarea>
+            </div>
+
+            {/* ===== 付款條件 ===== */}
+            <div>
+                <label className="font-semibold">付款條件：</label>
+                <textarea
+                    className="border p-2 rounded w-full"
+                    rows="4"
+                    value={activeQuote.payment}
+                    onChange={(e) =>
+                        updateQuote(activeQuoteId, { payment: e.target.value })
+                    }
+                ></textarea>
+            </div>
+
+            {/* ===== 列印 / PDF ===== */}
+            <div className="flex gap-4 pt-4">
+                <PrintButton quote={activeQuote} />
+                <ExportPDFButton quote={activeQuote} />
+            </div>
         </div>
     );
 }
-/***********************************************
- * D9 — 主 App（渲染至 #root）
- ***********************************************/
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
+/***************************************************
+ * ReactDOM — 渲染 AppProvider + App
+ ***************************************************/
+ReactDOM.createRoot(document.getElementById("root")).render(
+    <AppProvider>
+        <div className="flex">
+            {/* 左側 Sidebar */}
+            <div className="w-72 p-4 bg-gray-100 border-r min-h-screen">
+                <CompanySelector />
+                <QuoteList />
+            </div>
+
+            {/* 右側內容 */}
+            <div className="flex-1">
+                <App />
+            </div>
+        </div>
+    </AppProvider>
+);
 </script>
 
 </body>
