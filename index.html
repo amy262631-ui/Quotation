@@ -37,6 +37,7 @@
 // =======================================================
 // D1 — 共用工具函式
 // =======================================================
+// 這些函數保持在頂層，可被所有組件直接使用，無需 Context
 function uuid() {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;
@@ -51,7 +52,8 @@ function formatMoney(num) {
 }
 
 function calcAmount(item) {
-    return Number(item.qty || 0) * Number(item.price || 0);
+    // 💡 修正：確保 item 存在且 qty/price 是可轉換為數字的值
+    return Number(item?.qty || 0) * Number(item?.price || 0);
 }
 
 function calcTotal(items) {
@@ -83,7 +85,7 @@ function calcNegotiated(total, percent, customPrice) {
 // =======================================================
 const AppContext = React.createContext();
 
-/* 你的公司資料（已保留並使用你的資料）*/
+/* 你的公司資料 */
 const COMPANY_DATA = {
     herhsin: {
         name: "何鑫實業股份有限公司",
@@ -139,7 +141,6 @@ function generateQuoteNo(companyKey) {
 // =======================================================
 function AppProvider({ children }) {
 
-    // 預設公司為 herhsin
     const [company, setCompany] = React.useState("herhsin"); 
     const [quotes, setQuotes] = React.useState([]);
     const [activeQuoteId, setActiveQuoteId] = React.useState(null);
@@ -207,7 +208,7 @@ function AppProvider({ children }) {
     const createQuote = () => {
         const newQuote = {
             id: uuid(),
-            company, // 使用當前選中的公司
+            company, 
             quoteNo: generateQuoteNo(company),
             title: "未命名工程",
             customerName: "",
@@ -270,7 +271,7 @@ function AppProvider({ children }) {
         <AppContext.Provider
             value={{
                 company,
-                setCompany, // 導出 setCompany 供切換器使用
+                setCompany, 
                 quotes,
                 activeQuote,
                 activeQuoteId,
@@ -278,7 +279,7 @@ function AppProvider({ children }) {
                 createQuote,
                 deleteQuote,
                 updateQuote,
-                updateItem, // 導出更新品項函數
+                updateItem, 
                 specItems,
                 COMPANY_DATA
             }}
@@ -289,15 +290,16 @@ function AppProvider({ children }) {
 }
 
 // =======================================================
-// C3 — 報價項目編輯組件 (新增)
+// C3 — 報價項目編輯組件 
 // =======================================================
-function QuoteItemEditor({ item, updateItem, index }) {
-    const { calcAmount } = React.useContext(AppContext);
-    const itemAmount = calcAmount(item);
+function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) {
+    // 💡 修正: calcAmount 不再從 Context 獲取，因為它是一個頂層的輔助函數
+    const itemAmount = calcAmount(item); 
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        const finalValue = type === 'number' ? Number(value) : value;
+        // 確保數字類型輸入被轉換為 Number
+        const finalValue = type === 'number' ? Number(value) : value; 
         updateItem(item.id, { [name]: finalValue });
     };
 
@@ -355,9 +357,8 @@ function QuoteItemEditor({ item, updateItem, index }) {
 // =======================================================
 // D7 — PrintLayout（列印 / PDF 專用版面組件）
 // =======================================================
+// 此處無需修改
 function PrintLayout({ quote, companyData }) {
-    // 引入 jspdf 才能使用 window.jspdf
-    const jspdf = window.jspdf;
     
     if (!quote || !companyData) return <div style={{padding: '20px'}}>⚠️ 報價單或公司資料不完整</div>;
 
@@ -632,10 +633,13 @@ function PrintButton() {
         const container = win.document.createElement("div");
         win.document.body.appendChild(container);
 
-        ReactDOM.render(<PrintLayout quote={activeQuote} companyData={companyData} />, container);
+        // 💡 修正: 使用 createRoot 進行新視窗渲染
+        const printRoot = ReactDOM.createRoot(container); 
+        printRoot.render(<PrintLayout quote={activeQuote} companyData={companyData} />);
 
         setTimeout(() => {
             win.print();
+            // 💡 備註: 這裡不需要 unmount，因為是新視窗
         }, 500);
     };
 
@@ -662,7 +666,6 @@ function ExportPDFButton() {
             return;
         }
         const companyData = COMPANY_DATA[activeQuote.company];
-        // 確保 jspdf 和 html2canvas 載入
         const { jsPDF } = window.jspdf || {}; 
         
         if (typeof html2canvas === 'undefined' || typeof jsPDF === 'undefined') {
@@ -680,7 +683,9 @@ function ExportPDFButton() {
         document.body.appendChild(hidden);
 
         // 2. 渲染列印版
-        ReactDOM.render(<PrintLayout quote={activeQuote} companyData={companyData} />, hidden);
+        // 💡 修正: 使用 createRoot 進行隱藏 DOM 渲染
+        const hiddenRoot = ReactDOM.createRoot(hidden);
+        hiddenRoot.render(<PrintLayout quote={activeQuote} companyData={companyData} />);
 
         // 3. 等待渲染完成
         await new Promise(res => setTimeout(res, 500));
@@ -711,7 +716,7 @@ function ExportPDFButton() {
             alert("生成 PDF 過程中發生錯誤，請檢查控制台。");
         } finally {
             // 7. 清理
-            ReactDOM.unmountComponentAtNode(hidden);
+            hiddenRoot.unmount(); // 💡 修正: 使用 unmount 清理 createRoot 渲染的內容
             document.body.removeChild(hidden);
         }
     };
@@ -728,7 +733,7 @@ function ExportPDFButton() {
 
 
 // =======================================================
-// D0 — App（主要渲染入口，已恢復公司切換和編輯區）
+// D0 — App（主要渲染入口）
 // =======================================================
 function App() {
     const { 
@@ -834,7 +839,7 @@ function App() {
                         </div>
                     </div>
                     
-                    {/* ===== 報價品項列表 (已恢復) ===== */}
+                    {/* ===== 報價品項列表 (已修復 calcAmount 錯誤) ===== */}
                     <h3 className="text-xl font-semibold mb-3 border-b pb-2">報價品項 (共 {activeQuote.items.length} 項)</h3>
                     {activeQuote.items.map((item, index) => (
                         <QuoteItemEditor 
@@ -842,6 +847,8 @@ function App() {
                             item={item} 
                             updateItem={updateItem} 
                             index={index}
+                            activeQuote={activeQuote} // 傳遞 activeQuote 和 updateQuote 供刪除使用
+                            updateQuote={updateQuote}
                         />
                     ))}
 
@@ -937,13 +944,12 @@ function App() {
 // =======================================================
 // Main Render
 // =======================================================
-ReactDOM.render(
+// 💡 修正: 更改為 React 18 的 createRoot API
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
     <AppProvider>
         <App />
-    </AppProvider>,
-    document.getElementById("root")
+    </AppProvider>
 );
 
 </script>
-</body>
-</html>
