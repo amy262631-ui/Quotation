@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（Herhsin & SinChang）- 最終整合版</title>
+    <title>工程報價系統（Herhsin & SinChang）- 最終完整版</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -26,10 +26,15 @@
         .no-print { display: none; }
     }
 </style>
-<script type="text/babel">
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
 
 // =======================================================
-// D1 — 共用工具函式 (保持不變)
+// D1 — 共用工具函式
 // =======================================================
 function uuid() {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -41,6 +46,7 @@ function uuid() {
 
 function formatMoney(num) {
     if (!num || isNaN(num)) return "0";
+    // 確保只顯示整數
     return Number(num).toLocaleString("zh-TW", { maximumFractionDigits: 0 }); 
 }
 
@@ -52,11 +58,7 @@ function calcTotal(items) {
     let sum = 0;
     items.forEach(i => {
         sum += calcAmount(i);
-        if (i.subItems) {
-            i.subItems.forEach(s => {
-                if (s.type === "item") sum += calcAmount(s);
-            });
-        }
+        // 不計算 subItems 的金額，只計算主項目
     });
     return sum;
 }
@@ -140,6 +142,7 @@ function AppProvider({ children }) {
     /* Google Sheet — 材料規格品 */
     const [specItems, setSpecItems] = React.useState([]);
 
+    // 這裡使用您 Google Sheet 的公開 CSV 連結
     const SPEC_URL =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv";
 
@@ -167,13 +170,14 @@ function AppProvider({ children }) {
         localStorage.setItem("HERHSIN_ACTIVE_QUOTE_ID", activeQuoteId);
     }, [quotes, activeQuoteId]);
 
-    /* 載入 Google Sheet */
+    /* 載入 Google Sheet (修正 CSV 解析，確保資料穩定) */
     React.useEffect(() => {
         async function loadSpec() {
             try {
                 const res = await fetch(SPEC_URL);
                 const text = await res.text();
 
+                // 處理 CSV 格式，特別是帶有逗號的欄位（如規格）
                 const rows = text.split("\n").map(r => r.trim()).filter(r => r.length);
                 const header = rows[0].split(",").map(h => h.trim());
 
@@ -188,12 +192,14 @@ function AppProvider({ children }) {
                 };
 
                 const list = rows.slice(1).map(row => {
+                    // 使用正規表達式來解析 CSV 行，處理引號內的逗號
                     const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g); 
                     if (!cols || cols.length !== header.length) return null; 
 
                     const obj = {};
                     header.forEach((h, i) => {
                         let val = cols[i] || "";
+                        // 移除欄位前後的引號
                         val = val.replace(/^"|"$/g, "");
                         
                         const propName = headerMap[h] || h; 
@@ -202,7 +208,7 @@ function AppProvider({ children }) {
                     
                     obj.price = Number(obj.price) || 0;
                     return obj;
-                }).filter(Boolean);
+                }).filter(Boolean); // 移除解析失敗的行
 
                 setSpecItems(list);
             } catch (err) {
@@ -315,9 +321,33 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
         }
     }, [item.name]);
 
-    // 用於延遲關閉下拉選單，防止點擊建議時 onBlur 立即觸發
-    const dropdownRef = React.useRef(null);
     const inputRef = React.useRef(null);
+
+    // 篩選邏輯：只要品名包含輸入文字，即顯示建議清單
+    const handleFilterSuggestions = (value) => {
+        if (!value.trim()) {
+            setSuggestions([]);
+            return;
+        }
+
+        const lowerValue = value.toLowerCase();
+
+        // 篩選：匹配品名包含輸入文字的所有項目
+        const filtered = specItems.filter(spec => 
+            spec.name && spec.name.toLowerCase().includes(lowerValue)
+        );
+
+        // 排序：讓以輸入文字開頭的項目優先顯示
+        const sorted = filtered.sort((a, b) => {
+            const aStarts = a.name.toLowerCase().startsWith(lowerValue);
+            const bStarts = b.name.toLowerCase().startsWith(lowerValue);
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        setSuggestions(sorted.slice(0, 10)); // 只顯示前 10 筆
+    }
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
@@ -325,25 +355,14 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
         if (name === 'name') {
             setSearchTerm(value);
             updateItem(item.id, { [name]: value });
-            
-            // 自動完成篩選邏輯：只匹配第一個字，且品名不能為空
-            if (value.trim().length > 0) {
-                const firstChar = value.trim().charAt(0);
-                const filtered = specItems.filter(spec => 
-                    spec.name && spec.name.startsWith(firstChar)
-                ).slice(0, 10); // 只顯示前 10 筆
-                setSuggestions(filtered);
-            } else {
-                setSuggestions([]);
-            }
-
+            handleFilterSuggestions(value); // 每次輸入都篩選
         } else {
             const finalValue = type === 'number' ? Number(value) : value; 
             updateItem(item.id, { [name]: finalValue });
         }
     };
 
-    // 處理選擇建議
+    // 處理選擇建議 (重點：自動帶入規格、單位、單價、用料)
     const handleSelectSuggestion = (suggestion) => {
         // 1. 更新輸入框
         setSearchTerm(suggestion.name);
@@ -360,9 +379,10 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
             specMaterial3: suggestion.specMaterial3 || '',
         });
         
-        // 確保輸入框失去焦點後不會再次彈出建議
+        // 確保輸入框失去焦點
         if (inputRef.current) {
              inputRef.current.blur();
+             setTimeout(() => setSuggestions([]), 10);
         }
     };
     
@@ -375,8 +395,8 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                 const newImageSubItem = {
                     id: uuid(),
                     type: 'image',
-                    url: reader.result, // Base64 URL
-                    text: file.name // 檔名，但報價單上不顯示
+                    url: reader.result, 
+                    text: file.name
                 };
 
                 const newSubItems = [...(item.subItems || []), newImageSubItem];
@@ -420,7 +440,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                             // 延遲隱藏，給予時間點擊建議
                             setTimeout(() => setSuggestions([]), 200);
                         }}
-                        onFocus={handleChange} // 聚焦時也觸發一次篩選
+                        onFocus={() => handleFilterSuggestions(searchTerm)} // 聚焦時也觸發一次篩選
                         className="w-full border px-3 py-2 rounded focus:ring-blue-500 focus:border-blue-500" 
                         autoComplete="off"
                     />
@@ -428,8 +448,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                     {/* 自動完成下拉選單 */}
                     {suggestions.length > 0 && (
                         <div 
-                            ref={dropdownRef}
-                            className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
+                            className="absolute z-10 w-96 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
                         >
                             {suggestions.map((suggestion, idx) => (
                                 <div 
@@ -440,7 +459,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                                     }}
                                     className="p-3 cursor-pointer hover:bg-blue-100 text-gray-800"
                                 >
-                                    {/* 顯示品名和規格 */}
+                                    {/* 顯示品名、規格、單位、單價 */}
                                     <div className="font-bold">{suggestion.name}</div>
                                     <div className="text-gray-500 text-sm">
                                         規格: {suggestion.specMain || 'N/A'} | 單位: {suggestion.unit || '式'} | 單價: {formatMoney(suggestion.price)}
@@ -539,7 +558,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
 }
 
 // =======================================================
-// D3 — 報價單預覽組件 (新增功能)
+// D3 — 報價單預覽組件
 // =======================================================
 function QuotePreview({ quote, companyData }) {
     if (!quote) return null;
@@ -556,7 +575,7 @@ function QuotePreview({ quote, companyData }) {
 
 
 // =======================================================
-// D7 — PrintLayout (列印/預覽版面)
+// D7 — PrintLayout (列印/預覽版面 - 圖片置中修正於此)
 // =======================================================
 function PrintLayout({ quote, companyData }) {
     
@@ -581,13 +600,13 @@ function PrintLayout({ quote, companyData }) {
         quote.negotiatedPrice
     );
     
-    // 判斷是否顯示議價後總價欄位 (新需求)
+    // 判斷是否顯示議價後總價欄位 (大於 0 才顯示)
     const showNegotiatedRow = Number(quote.discountPercent) > 0 || Number(quote.negotiatedPrice) > 0;
 
     return (
         <div style={{ padding: "10px", fontFamily: "Microsoft JhengHei, sans-serif" }}>
 
-            {/* 🌟 1. 公司全名稱置中顯示 (新需求) */}
+            {/* 🌟 1. 公司全名稱置中顯示 */}
             <h1 
                 style={{
                     fontSize: "28px", 
@@ -679,10 +698,10 @@ function PrintLayout({ quote, companyData }) {
                                     ) : null
                                 )}
 
-                                {/* ===== 3. 補充圖片 (新需求：圖片置中，不顯示名稱) ===== */}
+                                {/* ===== 3. 補充圖片 (修正：圖片置中) ===== */}
                                 {(item.subItems || [])
                                     .filter(s => s.type === "image" && s.url)
-                                    .map((s, imgIdx) => (
+                                    .map((s) => (
                                         <tr key={s.id + "_img"}>
                                             <td colSpan="8" style={{ ...td, textAlign: "center", padding: '15px' }}>
                                                 <img
@@ -693,7 +712,9 @@ function PrintLayout({ quote, companyData }) {
                                                         height: 'auto',
                                                         width: 'auto',
                                                         border: "1px solid #ccc",
-                                                        objectFit: 'contain'
+                                                        objectFit: 'contain',
+                                                        display: 'block', // 關鍵：讓 margin: auto 生效
+                                                        margin: '0 auto'  // 關鍵：水平置中
                                                     }}
                                                     alt="補充圖片"
                                                 />
@@ -721,7 +742,7 @@ function PrintLayout({ quote, companyData }) {
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
                     </tr>
 
-                    {/* ===== 議價後總價行 (新需求：條件顯示) ===== */}
+                    {/* ===== 議價後總價行 (條件顯示) ===== */}
                     {showNegotiatedRow && (
                         <tr>
                             <td colSpan="7" style={tdRightBold}>議價後總價（未稅）</td>
@@ -800,6 +821,7 @@ function PrintLayout({ quote, companyData }) {
     );
 }
 
+
 // =======================================================
 // D6 — 列印 PrintButton
 // =======================================================
@@ -824,6 +846,7 @@ function PrintButton() {
              return;
         }
         
+        // 寫入基礎 HTML 和樣式到新的列印窗口
         win.document.write(`
             <html>
             <head>
@@ -851,10 +874,12 @@ function PrintButton() {
         `);
         win.document.close();
 
+        // 使用 ReactDOM 將 PrintLayout 渲染到新的窗口
         const container = win.document.querySelector(".print-container");
         const printRoot = ReactDOM.createRoot(container); 
-        printRoot.render(<AppProvider><PrintLayout quote={activeQuote} companyData={companyData} /></AppProvider>);
+        printRoot.render(<PrintLayout quote={activeQuote} companyData={companyData} />);
 
+        // 等待渲染完成後再執行列印
         setTimeout(() => {
             win.print();
         }, 500);
@@ -895,7 +920,7 @@ function ExportPDFButton() {
         hidden.style.position = "fixed";
         hidden.style.top = "-9999px";
         hidden.style.left = "-9999px";
-        hidden.style.width = "794px"; // 模擬 A4 寬度 (794px for A4 landscape)
+        hidden.style.width = "794px"; // 模擬 A4 寬度
         hidden.style.fontFamily = "Microsoft JhengHei, sans-serif"; 
         hidden.style.padding = "20px";
         document.body.appendChild(hidden);
@@ -1007,6 +1032,7 @@ function App() {
             return item;
         });
 
+        // 將新報價單加入列表，並設為當前活動
         setQuotes(prev => [newQuote, ...prev]);
         setActiveQuoteId(newQuote.id);
         alert(`報價單 ${activeQuote.quoteNo} 已複製為 ${newQuote.quoteNo}`);
@@ -1222,3 +1248,5 @@ root.render(
 );
 
 </script>
+</body>
+</html>
