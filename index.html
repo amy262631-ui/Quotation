@@ -694,14 +694,20 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
  * D6 — 列印 PrintButton（使用 ReactDOMServer）
  ***************************************************/
 function PrintButton({ quote }) {
-
     const handlePrint = () => {
         if (!quote) {
             alert("尚未選擇報價單");
             return;
         }
 
-        const html = ReactDOMServer.renderToString(
+        // 開新視窗
+        const win = window.open("", "_blank");
+
+        // 直接渲染 PrintLayout 到 DOM，而不是 renderToString
+        const container = document.createElement("div");
+        win.document.body.appendChild(container);
+
+        ReactDOM.render(
             <PrintLayout
                 quote={quote}
                 totalAmount={calcTotal(quote.items)}
@@ -710,35 +716,19 @@ function PrintButton({ quote }) {
                     quote.discountPercent,
                     quote.negotiatedPrice
                 )}
-            />
+            />,
+            container
         );
 
-        const win = window.open("", "_blank");
-
-        win.document.write(`
-            <html>
-            <head>
-                <title>列印報價單</title>
-                <style>
-                    body { font-family: "Microsoft JhengHei"; padding: 20px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { border: 1px solid black; padding: 6px; }
-                    .stamp { width: 160px; }
-                </style>
-            </head>
-            <body>${html}</body>
-            </html>
-        `);
-
-        win.document.close();
-        win.focus();
-        win.print();
+        setTimeout(() => {
+            win.print();
+        }, 500);
     };
 
     return (
         <button
-            onClick={handlePrint}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={handlePrint}
         >
             🖨 列印報價單
         </button>
@@ -749,16 +739,20 @@ function PrintButton({ quote }) {
  * D6 — 產生 PDF（使用 html2canvas + jsPDF）
  ***************************************************/
 function ExportPDFButton({ quote }) {
-
     const generatePDF = async () => {
         if (!quote) {
-            alert("尚未選擇報價單");
+            alert("請先選擇報價單");
             return;
         }
 
-        const container = document.createElement("div");
+        // 建立隱藏 DOM
+        const hidden = document.createElement("div");
+        hidden.style.position = "fixed";
+        hidden.style.top = "-9999px";
+        hidden.style.left = "-9999px";
+        document.body.appendChild(hidden);
 
-        const html = ReactDOMServer.renderToString(
+        ReactDOM.render(
             <PrintLayout
                 quote={quote}
                 totalAmount={calcTotal(quote.items)}
@@ -767,35 +761,34 @@ function ExportPDFButton({ quote }) {
                     quote.discountPercent,
                     quote.negotiatedPrice
                 )}
-            />
+            />,
+            hidden
         );
 
-        container.innerHTML = html;
-        document.body.appendChild(container);
+        await new Promise(res => setTimeout(res, 300));
 
-        const canvas = await html2canvas(container, { scale: 2, useCORS: true });
-        const imgData = canvas.toDataURL("image/png");
+        const canvas = await html2canvas(hidden, { scale: 2 });
+        const img = canvas.toDataURL("image/png");
 
         const pdf = new jspdf.jsPDF("p", "mm", "a4");
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const w = pdf.internal.pageSize.getWidth();
+        const h = (canvas.height * w) / canvas.width;
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.addImage(img, "PNG", 0, 0, w, h);
         pdf.save(`報價單_${quote.quoteNo}.pdf`);
 
-        document.body.removeChild(container);
+        document.body.removeChild(hidden);
     };
 
     return (
         <button
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
             onClick={generatePDF}
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 ml-3"
         >
             📄 轉 PDF
         </button>
     );
 }
-
 /***************************************************
  * D7 — PrintLayout（A4 列印模板）
  ***************************************************/
