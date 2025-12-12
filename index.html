@@ -62,6 +62,7 @@
 <body class="text-gray-900">
     <div id="root"></div>
     <div id="printArea"></div>
+<script type="text/babel">    
 /***********************************************************
  * 全域資料中心 AppContext
  ***********************************************************/
@@ -1025,10 +1026,12 @@ function App() {
  * ReactDOM Render
  ***********************************************************/
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-<!-- 🔹 列印專用隱藏區塊 -->
-<div id="printArea" style="display:none;"></div>
 
-</script>
+</script> <!-- ⭐ 這是 JS 的結尾，緊接在 render 後面 -->
+
+<!-- 🔹 列印專用隱藏區塊（⚠ 不可以放在 script 裡） -->
+<div id="printArea" style="display:none;"></div>
 
 </body>
 </html>
+
