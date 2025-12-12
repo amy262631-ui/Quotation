@@ -179,6 +179,24 @@ function calcTotal(items) {
     return sum + main + subs;
   }, 0);
 }
+// 報價單編號
+function generateQuoteNo(companyKey) {
+    const prefix = COMPANY_DATA[companyKey]?.prefix || "Q"; 
+    
+    // 使用 YYYYMMDDHHMM + 4位亂數
+    const d = new Date();
+    const parts = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+        String(d.getHours()).padStart(2, "0"),
+        String(d.getMinutes()).padStart(2, "0"),
+    ].join('');
+    
+    const random = Math.floor(1000 + Math.random() * 9000);
+    
+    return `${prefix}${parts}-${random}`; 
+}
 
 function calcNegotiated(total, discountPercent, custom) {
   if (Number(custom) > 0) return Number(custom);
