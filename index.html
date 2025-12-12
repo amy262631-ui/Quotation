@@ -1513,12 +1513,18 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
       return;
     }
 
-    // 2. 確認 ReactDOMServer 有載入成功
-    if (!isReactDOMServerAvailable) {
-      console.log("ReactDOMServer 檢查：", ReactDOMServer);
-      alert("列印失敗：ReactDOMServer 模組尚未準備好。");
-      return;
-    }
+    // 2. 確認 ReactDOMServer 是否可用
+if (
+  !window.ReactDOMServer ||
+  typeof window.ReactDOMServer.renderToStaticMarkup !== "function"
+) {
+  console.log("ReactDOMServer 檢查：", window.ReactDOMServer);
+  alert(
+    "列印失敗：ReactDOMServer 模組尚未準備好。\n" +
+    "請確認 CDN 已正確載入，並放置在 <script type=\"text/babel\"> 之前。"
+  );
+  return;
+}
 
     // 3. 取得預覽容器
     const printArea = document.getElementById("quotePreviewArea");
@@ -1541,7 +1547,7 @@ function PrintButton({ quote, totalAmount, negotiatedAmount }) {
     // 5. 用 ReactDOMServer 轉成靜態 HTML
     let htmlContent = "";
     try {
-      htmlContent = ReactDOMServer.renderToStaticMarkup(printComponent);
+      htmlContent = window.ReactDOMServer.renderToStaticMarkup(printComponent);
     } catch (e) {
       console.error("ReactDOMServer 渲染失敗:", e);
       alert("列印渲染失敗：" + e.message);
