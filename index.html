@@ -12,19 +12,19 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <!-- ReactDOMServer（PDF/列印用）-->
+    <!-- ReactDOMServer（列印 / PDF 用） -->
     <script src="https://unpkg.com/react-dom@18/umd/react-dom-server.browser.production.min.js"></script>
 
-    <!-- Babel for JSX -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- XLSX for Excel export（如未使用可移除） -->
+    <!-- XLSX（如需輸出 Excel） -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-    <!-- FileSaver（PDF 下載用）-->
+    <!-- FileSaver（PDF 截圖用）-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-    <!-- html2canvas（PDF 截圖用）-->
+    <!-- html2canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- jsPDF -->
@@ -42,8 +42,9 @@
 <div id="root"></div>
 
 <script type="text/babel">
+
 /***************************************************
- * D1 — 全域工具函式（uuid, formatMoney, calcAmount）
+ * D1 — 共用工具函式
  ***************************************************/
 function uuid() {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -82,11 +83,11 @@ function calcNegotiated(total, percent, customPrice) {
 }
 
 /***************************************************
- * D2 — AppContext（公司資料 / 報價單資料中心）
+ * D2 — AppContext（公司資料＋全域狀態）
  ***************************************************/
 const AppContext = React.createContext();
 
-/* 公司資料（含印章） */
+/* 你的公司資料（完全保留）*/
 const COMPANY_DATA = {
     herhsin: {
         name: "何鑫實業股份有限公司",
@@ -108,7 +109,7 @@ const COMPANY_DATA = {
     }
 };
 
-/* 預設備註 */
+/* 預設備註（保留）*/
 const DEFAULT_NOTES = `1. 本報價未含加值稅。
 2. 安裝施作時需注意現場作業環境。
 3. 報價單有效期限為 15 天。
@@ -121,10 +122,10 @@ const DEFAULT_PAYMENT = `訂金：40%
 製作完成：30%
 安裝完成：20%
 完工驗收：10%`;
-/* 報價單編號產生器（createQuote 用） */
+
+/* 報價單編號產生器 */
 function generateQuoteNo(companyKey) {
     const prefix = COMPANY_DATA[companyKey]?.prefix || "Q";
-
     const d = new Date();
     const datePart =
         d.getFullYear().toString() +
@@ -132,13 +133,13 @@ function generateQuoteNo(companyKey) {
         String(d.getDate()).padStart(2, "0") +
         String(d.getHours()).padStart(2, "0") +
         String(d.getMinutes()).padStart(2, "0");
-
     const random = Math.floor(1000 + Math.random() * 9000);
 
     return `${prefix}${datePart}-${random}`;
-}    
+}
+
 /***************************************************
- * D2 — AppProvider（完整狀態管理：quotes + 公司切換 + specItems）
+ * D2 — AppProvider（含 GoogleSheet 載入）
  ***************************************************/
 function AppProvider({ children }) {
 
@@ -146,15 +147,13 @@ function AppProvider({ children }) {
     const [quotes, setQuotes] = React.useState([]);
     const [activeQuoteId, setActiveQuoteId] = React.useState(null);
 
-    /* Google Sheet 材料（Autocomplete 用） */
+    /* Google Sheet — 材料規格品 */
     const [specItems, setSpecItems] = React.useState([]);
 
     const SPEC_URL =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv";
 
-    /***************************************************
-     * 載入 localStorage
-     ***************************************************/
+    /* 讀取 localStorage */
     React.useEffect(() => {
         const saved = localStorage.getItem("HERHSIN_QUOTES");
         if (saved) {
@@ -170,16 +169,12 @@ function AppProvider({ children }) {
         }
     }, []);
 
-    /***************************************************
-     * 自動存回 localStorage
-     ***************************************************/
+    /* 自動存回 localStorage */
     React.useEffect(() => {
         localStorage.setItem("HERHSIN_QUOTES", JSON.stringify(quotes));
     }, [quotes]);
 
-    /***************************************************
-     * 載入 Google Sheet（規格品資料 → specItems）
-     ***************************************************/
+    /* 載入 Google Sheet */
     React.useEffect(() => {
         async function loadSpec() {
             try {
@@ -200,9 +195,8 @@ function AppProvider({ children }) {
                     return obj;
                 });
 
-                console.log("📌 規格品已載入：", list);
-
                 setSpecItems(list);
+                console.log("📌 規格品已載入：", list);
             } catch (err) {
                 console.error("Google Sheet 載入錯誤：", err);
             }
@@ -211,9 +205,7 @@ function AppProvider({ children }) {
         loadSpec();
     }, []);
 
-    /***************************************************
-     * 新增報價單
-     ***************************************************/
+    /* 新增報價單 */
     const createQuote = () => {
         const newQuote = {
             id: uuid(),
@@ -236,9 +228,7 @@ function AppProvider({ children }) {
         setActiveQuoteId(newQuote.id);
     };
 
-    /***************************************************
-     * 刪除報價單
-     ***************************************************/
+    /* 刪除報價單 */
     const deleteQuote = (id) => {
         const newList = quotes.filter(q => q.id !== id);
         setQuotes(newList);
@@ -248,14 +238,11 @@ function AppProvider({ children }) {
         }
     };
 
-    /***************************************************
-     * 更新報價單
-     ***************************************************/
-    const updateQuote = (id, update) => {
+    /* 更新報價單 */
+    const updateQuote = (id, update) =>
         setQuotes(prev =>
             prev.map(q => (q.id === id ? { ...q, ...update } : q))
         );
-    };
 
     const activeQuote = quotes.find(q => q.id === activeQuoteId) || null;
 
@@ -278,100 +265,8 @@ function AppProvider({ children }) {
         </AppContext.Provider>
     );
 }
-
 /***************************************************
- * D3 — 左側 UI：公司切換 + 報價單列表
- ***************************************************/
-
-/* ① 公司切換 */
-function CompanySelector() {
-    const { company, setCompany } = React.useContext(AppContext);
-
-    return (
-        <div className="mb-6 bg-white p-3 rounded shadow">
-            <h3 className="text-sm font-bold mb-2">選擇公司（編碼＋印章）</h3>
-
-            <select
-                className="w-full border rounded p-2"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-            >
-                <option value="herhsin">何鑫實業</option>
-                <option value="sinchang">薪昌股份有限公司</option>
-            </select>
-        </div>
-    );
-}
-
-/***************************************************
- * ② 報價單列表
- ***************************************************/
-function QuoteList() {
-    const {
-        quotes,
-        activeQuoteId,
-        setActiveQuoteId,
-        deleteQuote,
-        createQuote,
-    } = React.useContext(AppContext);
-
-    return (
-        <div className="bg-white p-3 rounded shadow">
-            <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-bold">報價單列表</h3>
-
-                <button
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                    onClick={createQuote}
-                >
-                    ＋ 新增
-                </button>
-            </div>
-
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-                {quotes.length === 0 && (
-                    <div className="text-xs text-gray-500 text-center py-4">
-                        尚無報價單，請新增。
-                    </div>
-                )}
-
-                {quotes.map((q) => (
-                    <div
-                        key={q.id}
-                        className={`p-2 rounded border cursor-pointer ${
-                            q.id === activeQuoteId
-                                ? "bg-blue-100 border-blue-500"
-                                : "bg-gray-50 hover:bg-gray-100"
-                        }`}
-                        onClick={() => setActiveQuoteId(q.id)}
-                    >
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <div className="font-bold text-sm">{q.title}</div>
-                                <div className="text-xs text-gray-500">{q.quoteNo}</div>
-                                <div className="text-xs text-gray-500">{q.date}</div>
-                            </div>
-
-                            <button
-                                className="text-red-600 text-xs hover:underline"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm("確定刪除此報價單？")) {
-                                        deleteQuote(q.id);
-                                    }
-                                }}
-                            >
-                                刪除
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-/***************************************************
- * D4 — Autocomplete（使用 specItems）
+ * D3 — Autocomplete（搜尋 GooGleSheet 材料）
  ***************************************************/
 function Autocomplete({ value, onChange, onSelect, list }) {
     const [show, setShow] = React.useState(false);
@@ -385,11 +280,11 @@ function Autocomplete({ value, onChange, onSelect, list }) {
                     setShow(true);
                 }}
                 placeholder="輸入品名關鍵字…"
-                className="border p-2 rounded w-full"
+                className="border p-3 rounded w-full text-base"
             />
 
             {show && list.length > 0 && (
-                <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto z-50">
+                <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto z-50 shadow-lg">
                     {list.map((row, idx) => (
                         <div
                             key={idx}
@@ -399,8 +294,12 @@ function Autocomplete({ value, onChange, onSelect, list }) {
                                 setShow(false);
                             }}
                         >
-                            <div className="font-bold">{row["名稱"] || row["品名"]}</div>
-                            <div className="text-gray-500 text-xs">{row["規格"]}</div>
+                            <div className="font-bold">
+                                {row["名稱"] || row["品名"]}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                                {row["規格"]}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -419,22 +318,23 @@ function searchSpecItems(keyword, specItems) {
         (row["名稱"] || row["品名"] || "").includes(key)
     );
 }
+
 /***************************************************
- * D8 — QuoteItem（最終保留版本）
+ * D4 — QuoteItem（單一項目編輯區）
+ *      已強化 UI（字體放大、欄位加粗、整齊版面）
  ***************************************************/
 function QuoteItem({ item, index, updateItem, deleteItem }) {
 
     const { specItems } = React.useContext(AppContext);
-
     const [nameInput, setNameInput] = React.useState(item.name || "");
     const [showList, setShowList] = React.useState(false);
 
-    /* 過濾出符合的材料 */
+    /* 過濾 autocomplete 結果 */
     const matchList = React.useMemo(() => {
         return searchSpecItems(nameInput, specItems);
     }, [nameInput, specItems]);
 
-    /* 選擇 autocomplete 材料 → 自動帶入所有欄位 */
+    /* 選定規格 → 自動帶入欄位 */
     const selectSpec = (row) => {
         updateItem(item.id, {
             name: row["名稱"] || row["品名"] || "",
@@ -452,13 +352,7 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
 
     /* 新增子項 */
     const addSubItem = (type) => {
-        const newSub = {
-            id: uuid(),
-            type,
-            text: "",
-            url: "",
-        };
-
+        const newSub = { id: uuid(), type, text: "", url: "" };
         updateItem(item.id, {
             subItems: [...(item.subItems || []), newSub]
         });
@@ -469,7 +363,6 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
         const newList = (item.subItems || []).map(s =>
             s.id === subId ? { ...s, ...value } : s
         );
-
         updateItem(item.id, { subItems: newList });
     };
 
@@ -480,14 +373,14 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
     };
 
     return (
-        <div className="p-4 bg-white rounded shadow border mb-4">
+        <div className="p-6 bg-white rounded-lg shadow border mb-6">
 
             {/* ===== 標題列 ===== */}
-            <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-bold">項目 {index}</h3>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-blue-700">項目 {index}</h3>
 
                 <button
-                    className="text-red-600 font-bold"
+                    className="text-red-600 font-bold text-lg"
                     onClick={() => deleteItem(item.id)}
                 >
                     ✕ 刪除此項
@@ -495,8 +388,8 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
             </div>
 
             {/* ===== 品名 + Autocomplete ===== */}
-            <div className="relative mb-3">
-                <label className="font-semibold">品名：</label>
+            <div className="relative mb-4">
+                <label className="font-semibold text-base">品名：</label>
 
                 <input
                     value={nameInput}
@@ -505,22 +398,22 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
                         updateItem(item.id, { name: e.target.value });
                         setShowList(true);
                     }}
-                    className="border w-full p-2 rounded"
+                    className="border w-full p-3 rounded text-base"
                     placeholder="輸入品名關鍵字…"
                 />
 
                 {showList && matchList.length > 0 && (
-                    <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto z-50">
+                    <div className="absolute bg-white border rounded w-full max-h-48 overflow-y-auto shadow-xl z-50">
                         {matchList.map((row, idx) => (
                             <div
                                 key={idx}
-                                className="p-2 hover:bg-blue-100 cursor-pointer"
+                                className="p-3 hover:bg-blue-100 cursor-pointer"
                                 onClick={() => selectSpec(row)}
                             >
-                                <div className="font-bold">
+                                <div className="font-semibold text-base">
                                     {row["名稱"] || row["品名"]}
                                 </div>
-                                <div className="text-gray-500 text-xs">
+                                <div className="text-gray-500 text-sm">
                                     {row["規格"]}
                                 </div>
                             </div>
@@ -530,39 +423,39 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
             </div>
 
             {/* ===== 規格 ===== */}
-            <div className="mb-3">
-                <label className="font-semibold">規格：</label>
+            <div className="mb-4">
+                <label className="font-semibold text-base">規格：</label>
                 <input
-                    className="border p-2 rounded w-full"
+                    className="border p-3 rounded w-full text-base"
                     value={item.specMain}
                     onChange={(e) => updateItem(item.id, { specMain: e.target.value })}
                 />
             </div>
 
             {/* ===== 用料 1~3 ===== */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label className="font-semibold">用料 1：</label>
+                    <label className="font-semibold text-base">用料 1：</label>
                     <input
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.specMaterial}
                         onChange={(e) => updateItem(item.id, { specMaterial: e.target.value })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">用料 2：</label>
+                    <label className="font-semibold text-base">用料 2：</label>
                     <input
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.specMaterial2}
                         onChange={(e) => updateItem(item.id, { specMaterial2: e.target.value })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">用料 3：</label>
+                    <label className="font-semibold text-base">用料 3：</label>
                     <input
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.specMaterial3}
                         onChange={(e) => updateItem(item.id, { specMaterial3: e.target.value })}
                     />
@@ -570,58 +463,58 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
             </div>
 
             {/* ===== 單位 / 數量 / 單價 ===== */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label className="font-semibold">單位：</label>
+                    <label className="font-semibold text-base">單位：</label>
                     <input
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.unit}
                         onChange={(e) => updateItem(item.id, { unit: e.target.value })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">數量：</label>
+                    <label className="font-semibold text-base">數量：</label>
                     <input
                         type="number"
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.qty}
                         onChange={(e) => updateItem(item.id, { qty: Number(e.target.value) })}
                     />
                 </div>
 
                 <div>
-                    <label className="font-semibold">單價：</label>
+                    <label className="font-semibold text-base">單價：</label>
                     <input
                         type="number"
-                        className="border p-2 rounded w-full"
+                        className="border p-3 rounded w-full text-base"
                         value={item.price}
                         onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
                     />
                 </div>
             </div>
 
-            {/* ===== 備註 ===== */}
+            {/* ===== 備註（主項目） ===== */}
             <div className="mb-4">
-                <label className="font-semibold">備註：</label>
+                <label className="font-semibold text-base">備註：</label>
                 <textarea
-                    className="border p-2 rounded w-full"
+                    className="border p-3 rounded w-full text-base"
                     value={item.remarks}
                     onChange={(e) => updateItem(item.id, { remarks: e.target.value })}
                 ></textarea>
             </div>
 
-            {/* ===== 子項目列表 ===== */}
-            <div className="space-y-3 mb-4">
+            {/* ===== 子項目（note / image） ===== */}
+            <div className="space-y-4 mb-4">
                 {(item.subItems || []).map((sub) => (
-                    <div key={sub.id} className="p-3 border rounded bg-gray-50">
+                    <div key={sub.id} className="p-4 border rounded bg-gray-50">
 
                         {/* 補充文字 */}
                         {sub.type === "note" && (
                             <>
-                                <label className="font-semibold">補充文字：</label>
+                                <label className="font-semibold text-base">補充文字：</label>
                                 <textarea
-                                    className="border p-2 rounded w-full"
+                                    className="border p-3 rounded w-full text-base"
                                     value={sub.text}
                                     onChange={(e) =>
                                         updateSubItem(sub.id, { text: e.target.value })
@@ -633,7 +526,7 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
                         {/* 補充圖片 */}
                         {sub.type === "image" && (
                             <>
-                                <label className="font-semibold">補充圖片：</label>
+                                <label className="font-semibold text-base">補充圖片：</label>
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -645,11 +538,10 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
                                         }
                                     }}
                                 />
-
                                 {sub.url && (
                                     <img
                                         src={sub.url}
-                                        className="mt-2 rounded border"
+                                        className="mt-3 rounded border"
                                         style={{ maxWidth: "260px" }}
                                     />
                                 )}
@@ -657,7 +549,7 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
                         )}
 
                         <button
-                            className="text-red-600 mt-2"
+                            className="text-red-600 mt-3 text-base"
                             onClick={() => deleteSubItem(sub.id)}
                         >
                             刪除子項
@@ -666,17 +558,17 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
                 ))}
             </div>
 
-            {/* ===== 新增子項按鈕 ===== */}
-            <div className="flex gap-3">
+            {/* ===== 新增子項 ===== */}
+            <div className="flex gap-4">
                 <button
-                    className="px-3 py-1 bg-blue-600 text-white rounded"
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-base"
                     onClick={() => addSubItem("note")}
                 >
                     ＋ 補充文字
                 </button>
 
                 <button
-                    className="px-3 py-1 bg-green-600 text-white rounded"
+                    className="px-4 py-2 bg-green-600 text-white rounded text-base"
                     onClick={() => addSubItem("image")}
                 >
                     ＋ 補充圖片
@@ -684,121 +576,24 @@ function QuoteItem({ item, index, updateItem, deleteItem }) {
             </div>
 
             {/* ===== 小計 ===== */}
-            <div className="text-right font-bold text-blue-700 mt-4">
+            <div className="text-right font-bold text-xl text-blue-800 mt-4">
                 小計：NT$ {formatMoney(item.qty * item.price)}
             </div>
         </div>
     );
 }
 /***************************************************
- * D6 — 列印 PrintButton（使用 ReactDOMServer）
+ * D7 — PrintLayout（列印 / PDF 專用）
  ***************************************************/
-function PrintButton({ quote }) {
-    const handlePrint = () => {
-        if (!quote) {
-            alert("尚未選擇報價單");
-            return;
-        }
-
-        // 開新視窗
-        const win = window.open("", "_blank");
-
-        // 直接渲染 PrintLayout 到 DOM，而不是 renderToString
-        const container = document.createElement("div");
-        win.document.body.appendChild(container);
-
-        ReactDOM.render(
-            <PrintLayout
-                quote={quote}
-                totalAmount={calcTotal(quote.items)}
-                negotiatedAmount={calcNegotiated(
-                    calcTotal(quote.items),
-                    quote.discountPercent,
-                    quote.negotiatedPrice
-                )}
-            />,
-            container
-        );
-
-        setTimeout(() => {
-            win.print();
-        }, 500);
-    };
-
-    return (
-        <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            onClick={handlePrint}
-        >
-            🖨 列印報價單
-        </button>
-    );
-}
-
-/***************************************************
- * D6 — 產生 PDF（使用 html2canvas + jsPDF）
- ***************************************************/
-function ExportPDFButton({ quote }) {
-    const generatePDF = async () => {
-        if (!quote) {
-            alert("請先選擇報價單");
-            return;
-        }
-
-        // 建立隱藏 DOM
-        const hidden = document.createElement("div");
-        hidden.style.position = "fixed";
-        hidden.style.top = "-9999px";
-        hidden.style.left = "-9999px";
-        document.body.appendChild(hidden);
-
-        ReactDOM.render(
-            <PrintLayout
-                quote={quote}
-                totalAmount={calcTotal(quote.items)}
-                negotiatedAmount={calcNegotiated(
-                    calcTotal(quote.items),
-                    quote.discountPercent,
-                    quote.negotiatedPrice
-                )}
-            />,
-            hidden
-        );
-
-        await new Promise(res => setTimeout(res, 300));
-
-        const canvas = await html2canvas(hidden, { scale: 2 });
-        const img = canvas.toDataURL("image/png");
-
-        const pdf = new jspdf.jsPDF("p", "mm", "a4");
-        const w = pdf.internal.pageSize.getWidth();
-        const h = (canvas.height * w) / canvas.width;
-
-        pdf.addImage(img, "PNG", 0, 0, w, h);
-        pdf.save(`報價單_${quote.quoteNo}.pdf`);
-
-        document.body.removeChild(hidden);
-    };
-
-    return (
-        <button
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-            onClick={generatePDF}
-        >
-            📄 轉 PDF
-        </button>
-    );
-}
-/***************************************************
- * D7 — PrintLayout（列印 / PDF 專用版）
- ***************************************************/
-function PrintLayout({ quote, companyData }) {
+function PrintLayout({ quote }) {
 
     if (!quote) return <div>沒有資料</div>;
 
+    const companyData = COMPANY_DATA[quote.company];
+
     const td = {
         border: "1px solid #000",
-        padding: "4px",
+        padding: "6px",
         fontSize: "13px",
         verticalAlign: "top"
     };
@@ -818,32 +613,42 @@ function PrintLayout({ quote, companyData }) {
     return (
         <div style={{ padding: "20px", fontFamily: "Microsoft JhengHei" }}>
 
-            {/* ===== 報價單標題 ===== */}
-            <h2 style={{ fontSize: "22px", fontWeight: "bold", textAlign: "center", marginBottom: "10px" }}>
+            {/* ===== 標題 ===== */}
+            <h2
+                style={{
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    marginBottom: "20px"
+                }}
+            >
                 工程報價單
             </h2>
 
             {/* ===== 基本資料 ===== */}
-            <table style={{ width: "100%", marginBottom: "10px" }}>
+            <table style={{ width: "100%", marginBottom: "15px" }}>
                 <tbody>
                     <tr>
-                        <td style={{ width: "50%" }}>
+                        <td style={{ width: "50%", fontSize: "14px" }}>
                             <div><b>工程名稱：</b>{quote.title}</div>
                             <div><b>客戶名稱：</b>{quote.customerName}</div>
+                            <div><b>聯絡人：</b>{quote.contact}</div>
                             <div><b>連絡電話：</b>{quote.phone}</div>
                             <div><b>安裝地點：</b>{quote.location}</div>
                         </td>
-                        <td style={{ width: "50%" }}>
+
+                        <td style={{ width: "50%", fontSize: "14px" }}>
                             <div><b>報價單號：</b>{quote.quoteNo}</div>
                             <div><b>日期：</b>{quote.date}</div>
                             <div><b>公司名稱：</b>{companyData.name}</div>
-                            <div><b>連絡電話：</b>{companyData.tel}</div>
+                            <div><b>公司電話：</b>{companyData.tel}</div>
+                            <div><b>地址：</b>{companyData.address}</div>
                         </td>
                     </tr>
                 </tbody>
             </table>
 
-            {/* ===== 表格 ===== */}
+            {/* ===== 主表格 ===== */}
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                     <tr>
@@ -861,16 +666,14 @@ function PrintLayout({ quote, companyData }) {
                 <tbody>
 
                     {quote.items.map((item, idx) => {
-                        const sub = item.subItems || [];
                         const amount = calcAmount(item);
-
                         return (
                             <>
-                                {/* ===== 主項次 ===== */}
+                                {/* ===== 主項 ===== */}
                                 <tr key={item.id}>
                                     <td style={tdCenter}>{idx + 1}</td>
                                     <td style={td}>{item.name}</td>
-                                    <td style={td}>{item.spec}</td>
+                                    <td style={td}>{item.specMain}</td>
                                     <td style={tdCenter}>{item.unit}</td>
                                     <td style={tdRight}>{item.qty}</td>
                                     <td style={tdRight}>{formatMoney(item.price)}</td>
@@ -878,41 +681,46 @@ function PrintLayout({ quote, companyData }) {
                                     <td style={td}>{item.remarks || ""}</td>
                                 </tr>
 
-                                {/* ===== 用料子項目 1-1 / 1-2 / 1-3 ===== */}
-                                {sub
-                                    .filter(s => s.type === "material")
-                                    .map((s, i) => (
-                                        <tr key={s.id}>
+                                {/* ===== 用料 1~3（依次產出 1-1 / 1-2 / 1-3） ===== */}
+                                {[
+                                    item.specMaterial,
+                                    item.specMaterial2,
+                                    item.specMaterial3
+                                ].map((mat, i) =>
+                                    mat ? (
+                                        <tr key={i + "material"}>
                                             <td style={tdCenter}>{`${idx + 1}-${i + 1}`}</td>
-                                            <td colSpan="2" style={td}>用料：{s.name}</td>
-                                            <td style={tdCenter}>{s.unit}</td>
-                                            <td style={tdRight}>{s.qty}</td>
-                                            <td style={tdRight}>{formatMoney(s.price)}</td>
-                                            <td style={tdRightBold}>{formatMoney(calcAmount(s))}</td>
-                                            <td style={td}></td>
+                                            <td colSpan="7" style={td}>
+                                                <b>用料：</b> {mat}
+                                            </td>
                                         </tr>
-                                    ))}
+                                    ) : null
+                                )}
 
-                                {/* ===== 補充說明（置中、整列） ===== */}
-                                {sub
+                                {/* ===== 補充說明 ===== */}
+                                {(item.subItems || [])
                                     .filter(s => s.type === "note")
-                                    .map(s => (
-                                        <tr key={s.id}>
-                                            <td colSpan="8" style={{ ...td, textAlign: "left" }}>
+                                    .map((s) => (
+                                        <tr key={s.id + "_note"}>
+                                            <td colSpan="8" style={{ ...td, background: "#fafafa" }}>
                                                 <b>補充說明：</b> {s.text}
                                             </td>
                                         </tr>
                                     ))}
 
-                                {/* ===== 補充照片（置中顯示） ===== */}
-                                {sub
+                                {/* ===== 補充圖片 ===== */}
+                                {(item.subItems || [])
                                     .filter(s => s.type === "image")
-                                    .map(s => (
-                                        <tr key={s.id}>
+                                    .map((s) => (
+                                        <tr key={s.id + "_img"}>
                                             <td colSpan="8" style={{ ...td, textAlign: "center" }}>
                                                 <img
                                                     src={s.url}
-                                                    style={{ maxWidth: "300px", margin: "10px auto" }}
+                                                    style={{
+                                                        maxWidth: "320px",
+                                                        margin: "10px auto",
+                                                        border: "1px solid #ccc"
+                                                    }}
                                                 />
                                             </td>
                                         </tr>
@@ -922,7 +730,7 @@ function PrintLayout({ quote, companyData }) {
                         );
                     })}
 
-                    {/* ===== 小計 ===== */}
+                    {/* ===== 總計 ===== */}
                     <tr>
                         <td colSpan="7" style={tdRightBold}>總計（未稅）</td>
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
@@ -941,34 +749,48 @@ function PrintLayout({ quote, companyData }) {
             <table style={{ width: "100%", marginTop: "20px" }}>
                 <tbody>
                     <tr>
-                        <td style={{ width: "50%", verticalAlign: "top" }}>
+                        <td style={{ width: "50%", fontSize: "14px", verticalAlign: "top" }}>
                             <b>備註：</b><br />
-                            <pre style={{ whiteSpace: "pre-wrap" }}>{quote.notes}</pre>
+                            <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px" }}>
+                                {quote.notes}
+                            </pre>
                         </td>
 
-                        <td style={{ width: "50%", verticalAlign: "top" }}>
+                        <td style={{ width: "50%", fontSize: "14px", verticalAlign: "top" }}>
                             <b>付款條件：</b><br />
-                            <pre style={{ whiteSpace: "pre-wrap" }}>{quote.payment}</pre>
+                            <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px" }}>
+                                {quote.payment}
+                            </pre>
                         </td>
                     </tr>
                 </tbody>
             </table>
 
-            {/* ===== 印章 + 客戶回簽 ===== */}
-            <table style={{ width: "100%", marginTop: "30px", borderCollapse: "collapse" }}>
+            {/* ===== 印章 + 客戶簽名 ===== */}
+            <table style={{
+                width: "100%",
+                marginTop: "30px",
+                borderCollapse: "collapse"
+            }}>
                 <tbody>
                     <tr>
                         {/* 公司印章 */}
-                        <td style={{ ...td, height: "120px", textAlign: "center" }}>
-                            <div>本公司蓋章</div>
+                        <td style={{
+                            ...td,
+                            height: "150px",
+                            textAlign: "center"
+                        }}>
+                            <div style={{ fontWeight: "bold", marginBottom: "6px" }}>
+                                本公司蓋章
+                            </div>
                             <img
                                 src={companyData.stamp}
-                                style={{ width: "120px", marginTop: "10px" }}
+                                style={{ width: "130px", marginTop: "10px" }}
                             />
                         </td>
 
                         {/* 客戶回簽 */}
-                        <td style={{ ...td, height: "120px", verticalAlign: "top" }}>
+                        <td style={{ ...td, height: "150px", fontSize: "14px" }}>
                             客戶簽名：__________________________<br /><br />
                             日期：______________________________
                         </td>
@@ -979,310 +801,679 @@ function PrintLayout({ quote, companyData }) {
         </div>
     );
 }
-
 /***************************************************
- * 表格樣式（列印專用）
+ * D6 — 列印 PrintButton（新版：不再使用 renderToString）
  ***************************************************/
-const th = {
-    border: "1px solid black",
-    padding: "6px",
-    background: "#eee",
-    textAlign: "center"
-};
+function PrintButton({ quote }) {
+    const handlePrint = () => {
+        if (!quote) {
+            alert("尚未選擇報價單");
+            return;
+        }
 
-const tdLeft = {
-    border: "1px solid black",
-    padding: "6px",
-    textAlign: "left"
-};
+        // 開新視窗
+        const win = window.open("", "_blank");
 
-const tdCenter = {
-    border: "1px solid black",
-    padding: "6px",
-    textAlign: "center"
-};
+        // 容器
+        const container = win.document.createElement("div");
+        win.document.body.appendChild(container);
 
-const tdRight = {
-    border: "1px solid black",
-    padding: "6px",
-    textAlign: "right"
-};
+        // 直接將 PrintLayout 渲染到新視窗的 DOM
+        ReactDOM.render(<PrintLayout quote={quote} />, container);
 
-const tdRightBold = {
-    border: "1px solid black",
-    padding: "6px",
-    fontWeight: "bold",
-    textAlign: "right"
-};
-
-const tdNote = {
-    border: "1px solid black",
-    padding: "6px",
-    background: "#fafafa",
-    fontSize: "13px"
-};
-/***************************************************
- * D9 — 主 App 畫面（右側編輯區）
- ***************************************************/
-function App() {
-    const {
-        activeQuote,
-        activeQuoteId,
-        updateQuote,
-    } = React.useContext(AppContext);
-
-    /* 新增一個項目 */
-    const addItem = () => {
-        if (!activeQuote) return;
-
-        const newItem = {
-            id: uuid(),
-            name: "",
-            specMain: "",
-            specMaterial: "",
-            specMaterial2: "",
-            specMaterial3: "",
-            unit: "",
-            qty: 1,
-            price: 0,
-            remarks: "",
-            subItems: []
-        };
-
-        updateQuote(activeQuoteId, {
-            items: [...activeQuote.items, newItem]
-        });
+        // 等待渲染後列印
+        setTimeout(() => {
+            win.print();
+        }, 500);
     };
-
-    /* 更新單一 item */
-    const updateItem = (id, value) => {
-        const list = activeQuote.items.map(i =>
-            i.id === id ? { ...i, ...value } : i
-        );
-        updateQuote(activeQuoteId, { items: list });
-    };
-
-    /* 刪除 item */
-    const deleteItem = (id) => {
-        const list = activeQuote.items.filter(i => i.id !== id);
-        updateQuote(activeQuoteId, { items: list });
-    };
-
-    if (!activeQuote) {
-        return (
-            <div className="p-6 text-gray-600">
-                尚未選擇報價單，請由左側列表新增或選取。
-            </div>
-        );
-    }
 
     return (
-        <div className="p-6 space-y-6">
-
-            {/* ===== 工程名稱 ===== */}
-            <div>
-                <label className="font-semibold">工程名稱：</label>
-                <input
-                    className="border p-2 rounded w-full"
-                    value={activeQuote.title}
-                    onChange={(e) =>
-                        updateQuote(activeQuoteId, { title: e.target.value })
-                    }
-                />
-            </div>
-
-            {/* ===== 客戶欄位 ===== */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="font-semibold">客戶名稱：</label>
-                    <input
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.customerName}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, { customerName: e.target.value })
-                        }
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold">聯絡人：</label>
-                    <input
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.contact}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, { contact: e.target.value })
-                        }
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold">電話：</label>
-                    <input
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.phone}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, { phone: e.target.value })
-                        }
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold">日期：</label>
-                    <input
-                        type="date"
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.date}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, { date: e.target.value })
-                        }
-                    />
-                </div>
-            </div>
-
-            {/* ===== 工程地點 ===== */}
-            <div>
-                <label className="font-semibold">工程地點：</label>
-                <input
-                    className="border p-2 rounded w-full"
-                    value={activeQuote.location}
-                    onChange={(e) =>
-                        updateQuote(activeQuoteId, { location: e.target.value })
-                    }
-                />
-            </div>
-
-            {/* ===== 新增項目按鈕 ===== */}
-            <button
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                onClick={addItem}
-            >
-                ＋ 新增項目
-            </button>
-
-            {/* ===== 所有項目 ===== */}
-            <div className="space-y-4">
-                {activeQuote.items.map((item, i) => (
-                    <QuoteItem
-                        key={item.id}
-                        item={item}
-                        index={i + 1}
-                        updateItem={updateItem}
-                        deleteItem={deleteItem}
-                    />
-                ))}
-            </div>
-
-            {/* ===== 議價相關 ===== */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="font-semibold">折扣（%）：</label>
-                    <input
-                        type="number"
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.discountPercent}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, {
-                                discountPercent: Number(e.target.value),
-                            })
-                        }
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold">議價後總價（直接輸入金額）：</label>
-                    <input
-                        type="number"
-                        className="border p-2 rounded w-full"
-                        value={activeQuote.negotiatedPrice}
-                        onChange={(e) =>
-                            updateQuote(activeQuoteId, {
-                                negotiatedPrice: Number(e.target.value),
-                            })
-                        }
-                    />
-                </div>
-            </div>
-
-            {/* ===== 備註 ===== */}
-            <div>
-                <label className="font-semibold">備註：</label>
-                <textarea
-                    className="border p-2 rounded w-full"
-                    rows="4"
-                    value={activeQuote.notes}
-                    onChange={(e) =>
-                        updateQuote(activeQuoteId, { notes: e.target.value })
-                    }
-                ></textarea>
-            </div>
-
-            {/* ===== 付款條件 ===== */}
-            <div>
-                <label className="font-semibold">付款條件：</label>
-                <textarea
-                    className="border p-2 rounded w-full"
-                    rows="4"
-                    value={activeQuote.payment}
-                    onChange={(e) =>
-                        updateQuote(activeQuoteId, { payment: e.target.value })
-                    }
-                ></textarea>
-            </div>
-
-            {/* ===== 列印 / PDF ===== */}
-            <div className="flex gap-4 pt-4">
-                <PrintButton quote={activeQuote} />
-                <ExportPDFButton quote={activeQuote} />
-            </div>
-            {/* 即時預覽區 */}
-<QuotePreview quote={activeQuote} />
-        </div>
+        <button
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={handlePrint}
+        >
+            🖨 列印報價單
+        </button>
     );
 }
+
+
 /***************************************************
- * D10 — 報價單即時預覽區（取代原本 renderToString 預覽）
+ * D6 — PDF 產生（html2canvas + jsPDF）
+ ***************************************************/
+function ExportPDFButton({ quote }) {
+    const generatePDF = async () => {
+        if (!quote) {
+            alert("請先選擇報價單");
+            return;
+        }
+
+        // 隱藏容器
+        const hidden = document.createElement("div");
+        hidden.style.position = "fixed";
+        hidden.style.top = "-9999px";
+        hidden.style.left = "-9999px";
+        hidden.style.width = "794px"; // A4 寬度
+        document.body.appendChild(hidden);
+
+        // 渲染列印版
+        ReactDOM.render(<PrintLayout quote={quote} />, hidden);
+
+        await new Promise(res => setTimeout(res, 300));
+
+        const canvas = await html2canvas(hidden, { scale: 2 });
+        const img = canvas.toDataURL("image/png");
+
+        const pdf = new jspdf.jsPDF("p", "mm", "a4");
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(img, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`報價單_${quote.quoteNo}.pdf`);
+
+        document.body.removeChild(hidden);
+    };
+
+    return (
+        <button
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            onClick={generatePDF}
+        >
+            📄 轉 PDF
+        </button>
+    );
+}
+
+
+/***************************************************
+ * D7 — 報價單即時預覽區（A4 置中）
  ***************************************************/
 function QuotePreview({ quote }) {
     if (!quote) return null;
 
     return (
         <div className="mt-10 p-6 bg-white shadow-lg border rounded">
+
             <h2 className="text-xl font-bold mb-3">📄 報價單預覽（即時）</h2>
-            <div className="scale-90 origin-top-left border shadow p-4 bg-white">
-                <PrintLayout
-                    quote={quote}
-                    totalAmount={calcTotal(quote.items)}
-                    negotiatedAmount={calcNegotiated(
-                        calcTotal(quote.items),
-                        quote.discountPercent,
-                        quote.negotiatedPrice
-                    )}
-                />
+
+            {/* A4 預覽容器 */}
+            <div
+                style={{
+                    width: "794px",         // A4 px 寬度
+                    margin: "0 auto",       // 置中
+                    padding: "20px",
+                    background: "white",
+                    boxShadow: "0 0 10px rgba(0,0,0,0.15)",
+                    transform: "scale(0.85)",
+                    transformOrigin: "top center",
+                }}
+            >
+                <PrintLayout quote={quote} />
             </div>
         </div>
     );
 }
-
 /***************************************************
- * ReactDOM — 渲染 AppProvider + App
+ * D8 — 主系統 App（新版 UI + 大字體 + 排版強化）
  ***************************************************/
-ReactDOM.createRoot(document.getElementById("root")).render(
-    <AppProvider>
-        <div className="flex">
-            {/* 左側 Sidebar */}
-            <div className="w-72 p-4 bg-gray-100 border-r min-h-screen">
-                <CompanySelector />
-                <QuoteList />
+function App() {
+    const {
+        quotes,
+        setQuotes,
+        activeQuoteId,
+        setActiveQuoteId,
+        company,
+        setCompany,
+        specItems
+    } = React.useContext(AppContext);
+
+    const activeQuote = quotes.find(q => q.id === activeQuoteId) || null;
+
+    const updateQuoteField = (id, field, value) => {
+        setQuotes(prev =>
+            prev.map(q => (q.id === id ? { ...q, [field]: value } : q))
+        );
+    };
+
+    return (
+        <div className="flex min-h-screen bg-gray-100">
+
+            {/* ----------------------------------------------------------
+               左側側邊欄 — UI 強化版
+            ---------------------------------------------------------- */}
+            <div className="w-72 bg-white border-r shadow-lg p-5">
+
+                <h1 className="text-2xl font-extrabold mb-5 text-gray-800">
+                    工程報價系統
+                </h1>
+
+                {/* 公司切換 */}
+                <div className="mb-5">
+                    <label className="block font-semibold text-gray-700 mb-1">
+                        報價公司
+                    </label>
+                    <select
+                        className="w-full border rounded p-2 text-lg"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                    >
+                        <option value="herhsin">何鑫實業</option>
+                        <option value="sinchang">薪昌股份</option>
+                    </select>
+                </div>
+
+                {/* 新增報價單 */}
+                <button
+                    className="w-full bg-blue-600 text-white py-3 text-lg rounded-lg shadow
+                               hover:bg-blue-700 transition mb-6"
+                    onClick={createQuote}
+                >
+                    ➕ 建立新報價單
+                </button>
+
+                {/* 報價單列表 */}
+                <h2 className="text-lg font-semibold mb-2 text-gray-700">
+                    📁 報價單列表
+                </h2>
+
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                    {quotes.map(q => (
+                        <div
+                            key={q.id}
+                            className={`p-3 rounded border cursor-pointer text-base ${
+                                q.id === activeQuoteId
+                                    ? "bg-blue-100 border-blue-500"
+                                    : "bg-gray-50 hover:bg-gray-100"
+                            }`}
+                            onClick={() => setActiveQuoteId(q.id)}
+                        >
+                            <div className="font-bold">{q.title || "未命名工程"}</div>
+                            <div className="text-sm text-gray-600">
+                                {q.quoteNo}｜{q.date}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
             </div>
 
-            {/* 右側內容 */}
-            <div className="flex-1">
-                <App />
+            {/* ----------------------------------------------------------
+               右側主要編輯區 — UI 全提升（文字大、欄位更舒服）
+            ---------------------------------------------------------- */}
+            <div className="flex-1 p-8 overflow-y-auto">
+
+                {activeQuote ? (
+                    <div className="max-w-5xl mx-auto">
+
+                        {/* 報價基本資訊 */}
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">
+                            📝 編輯報價單 — {activeQuote.quoteNo}
+                        </h2>
+
+                        <div className="grid grid-cols-2 gap-6 mb-8">
+
+                            <div>
+                                <label className="block font-semibold mb-1">工程名稱</label>
+                                <input
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.title}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "title", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">
+                                    客戶名稱
+                                </label>
+                                <input
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.customerName}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "customerName", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">
+                                    聯絡人
+                                </label>
+                                <input
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.contact}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "contact", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">
+                                    電話
+                                </label>
+                                <input
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.phone}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "phone", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">
+                                    工程地點
+                                </label>
+                                <input
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.location}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "location", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold mb-1">
+                                    報價日期
+                                </label>
+                                <input
+                                    type="date"
+                                    className="w-full border rounded p-3 text-lg"
+                                    value={activeQuote.date}
+                                    onChange={(e) =>
+                                        updateQuoteField(activeQuote.id, "date", e.target.value)
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        {/* --------------------------------------------------
+                            用料規格區 D8-2（保持你要求的下一段）
+                        -------------------------------------------------- */}
+                        <QuoteItemsEditor quote={activeQuote} />
+
+                        {/* 列印 / PDF */}
+                        <div className="flex gap-4 mt-10">
+                            <PrintButton quote={activeQuote} />
+                            <ExportPDFButton quote={activeQuote} />
+                        </div>
+
+                        {/* 預覽區 */}
+                        <QuotePreview quote={activeQuote} />
+
+                    </div>
+                ) : (
+                    <div className="text-center text-gray-500 text-xl mt-20">
+                        請從左側選擇或建立一張報價單
+                    </div>
+                )}
+
             </div>
         </div>
+    );
+}
+/***************************************************
+ * D8-2 — 報價單項目編輯 QuoteItemsEditor（強化版）
+ ***************************************************/
+function QuoteItemsEditor({ quote }) {
+    const { quotes, setQuotes, specItems } = React.useContext(AppContext);
+
+    const updateItem = (index, field, value) => {
+        const newItems = [...quote.items];
+        newItems[index][field] = value;
+        saveItems(newItems);
+    };
+
+    const saveItems = (newItems) => {
+        setQuotes(prev =>
+            prev.map(q =>
+                q.id === quote.id ? { ...q, items: newItems } : q
+            )
+        );
+    };
+
+    const addItem = () => {
+        const newItem = {
+            id: uuid(),
+            name: "",
+            spec: "",
+            unit: "",
+            qty: "",
+            price: "",
+            material1: "",
+            material2: "",
+            material3: "",
+            note: "",
+            photo: ""
+        };
+        saveItems([...quote.items, newItem]);
+    };
+
+    const deleteItem = (index) => {
+        const newItems = [...quote.items];
+        newItems.splice(index, 1);
+        saveItems(newItems);
+    };
+
+    const handlePhotoUpload = (index, file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            updateItem(index, "photo", reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    return (
+        <div className="mb-16">
+
+            {/* 標題列 */}
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">📦 報價內容</h3>
+                <button
+                    onClick={addItem}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-lg hover:bg-green-700"
+                >
+                    ➕ 新增項目
+                </button>
+            </div>
+
+            {/* 單項目 */}
+            <div className="space-y-10">
+                {quote.items.map((item, index) => (
+                    <div key={item.id} className="p-5 bg-white shadow border rounded-lg">
+
+                        {/* --------------------------------------------------
+                           第一行：品名、規格（含自動帶入）、單位、數量、單價
+                        -------------------------------------------------- */}
+                        <div className="grid grid-cols-5 gap-4 mb-4 items-end">
+
+                            <div>
+                                <label className="font-semibold">品名</label>
+                                <input
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.name}
+                                    onChange={(e) =>
+                                        updateItem(index, "name", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">規格</label>
+
+                                {/* 規格 Autocomplete */}
+                                <input
+                                    list={`specList_${index}`}
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.spec}
+                                    onChange={(e) =>
+                                        updateItem(index, "spec", e.target.value)
+                                    }
+                                />
+                                <datalist id={`specList_${index}`}>
+                                    {specItems.map((spec, i) => (
+                                        <option key={i} value={spec["規格"]} />
+                                    ))}
+                                </datalist>
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">單位</label>
+                                <input
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.unit}
+                                    onChange={(e) =>
+                                        updateItem(index, "unit", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">數量</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.qty}
+                                    onChange={(e) =>
+                                        updateItem(index, "qty", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">單價</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.price}
+                                    onChange={(e) =>
+                                        updateItem(index, "price", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                        </div>
+
+                        {/* --------------------------------------------------
+                           第二行：用料 1~3 分開獨立一列
+                        -------------------------------------------------- */}
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label className="font-semibold">用料 1</label>
+                                <input
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.material1}
+                                    onChange={(e) =>
+                                        updateItem(index, "material1", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">用料 2</label>
+                                <input
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.material2}
+                                    onChange={(e) =>
+                                        updateItem(index, "material2", e.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <label className="font-semibold">用料 3</label>
+                                <input
+                                    className="w-full border rounded p-2 text-lg"
+                                    value={item.material3}
+                                    onChange={(e) =>
+                                        updateItem(index, "material3", e.target.value)
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        {/* --------------------------------------------------
+                           備註：若有填寫 → PrintLayout 顯示於下一行
+                        -------------------------------------------------- */}
+                        <div className="mb-4">
+                            <label className="font-semibold">備註</label>
+                            <textarea
+                                className="w-full border rounded p-3 text-lg"
+                                rows="2"
+                                value={item.note}
+                                onChange={(e) =>
+                                    updateItem(index, "note", e.target.value)
+                                }
+                            />
+                        </div>
+
+                        {/* --------------------------------------------------
+                           圖片上傳（置中）
+                        -------------------------------------------------- */}
+                        <div className="text-center mb-4">
+                            {item.photo ? (
+                                <img
+                                    src={item.photo}
+                                    className="max-h-60 mx-auto rounded border"
+                                />
+                            ) : (
+                                <div className="text-gray-500 mb-2">
+                                    （未選擇圖片）
+                                </div>
+                            )}
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                    handlePhotoUpload(index, e.target.files[0])
+                                }
+                            />
+                        </div>
+
+                        {/* 刪除按鈕 */}
+                        <div className="text-right">
+                            <button
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                                onClick={() => deleteItem(index)}
+                            >
+                                🗑 刪除此項目
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+/***************************************************
+ * D9 — AppProvider（包住整個系統）
+ ***************************************************/
+function AppProvider({ children }) {
+    const [company, setCompany] = React.useState("herhsin");
+    const [quotes, setQuotes] = React.useState([]);
+    const [activeQuoteId, setActiveQuoteId] = React.useState(null);
+
+    /* Google Sheet 規格資料 */
+    const [specItems, setSpecItems] = React.useState([]);
+
+    const SPEC_URL =
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv";
+
+    /***************************************************
+     * 讀取 localStorage 報價單資料
+     ***************************************************/
+    React.useEffect(() => {
+        const saved = localStorage.getItem("HERHSIN_QUOTES");
+        if (saved) {
+            try {
+                const arr = JSON.parse(saved);
+                if (Array.isArray(arr)) {
+                    setQuotes(arr);
+                    if (arr.length > 0) setActiveQuoteId(arr[0].id);
+                }
+            } catch (err) {
+                console.error("localStorage load failed:", err);
+            }
+        }
+    }, []);
+
+    /***************************************************
+     * 自動存回 localStorage
+     ***************************************************/
+    React.useEffect(() => {
+        localStorage.setItem("HERHSIN_QUOTES", JSON.stringify(quotes));
+    }, [quotes]);
+
+    /***************************************************
+     * 載入 Google Sheet → 規格資料
+     ***************************************************/
+    React.useEffect(() => {
+        async function loadSpec() {
+            try {
+                const res = await fetch(SPEC_URL);
+                const text = await res.text();
+                const rows = text.split("\n");
+                const header = rows[0].split(",");
+
+                const parsed = rows
+                    .slice(1)
+                    .map((row) => {
+                        const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+                        if (!cols) return null;
+                        const item = {};
+                        header.forEach((h, i) => {
+                            let v = cols[i] || "";
+                            v = v.replace(/^"|"$/g, "");
+                            item[h.trim()] = v.trim();
+                        });
+                        return item;
+                    })
+                    .filter(Boolean);
+
+                console.log("📌 規格品已載入：", parsed.length);
+                setSpecItems(parsed);
+            } catch (err) {
+                console.error("❌ Google Sheet 載入錯誤：", err);
+            }
+        }
+
+        loadSpec();
+    }, []);
+
+    /***************************************************
+     * 建立新報價單
+     ***************************************************/
+    const createQuote = () => {
+        const newQuote = {
+            id: uuid(),
+            company,
+            quoteNo: generateQuoteNo(company),
+            title: "未命名工程",
+            customerName: "",
+            contact: "",
+            phone: "",
+            location: "",
+            date: new Date().toISOString().substring(0, 10),
+            items: [],
+            notes: DEFAULT_NOTES,
+            payment: DEFAULT_PAYMENT,
+            discountPercent: 0,
+            negotiatedPrice: 0
+        };
+
+        setQuotes((prev) => [newQuote, ...prev]);
+        setActiveQuoteId(newQuote.id);
+    };
+
+    return (
+        <AppContext.Provider
+            value={{
+                company,
+                setCompany,
+                quotes,
+                setQuotes,
+                activeQuoteId,
+                setActiveQuoteId,
+                createQuote,
+                specItems
+            }}
+        >
+            {children}
+        </AppContext.Provider>
+    );
+}
+
+
+/***************************************************
+ * D10 — ReactDOM Render（React 18）
+ ***************************************************/
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+    <AppProvider>
+        <App />
     </AppProvider>
 );
-</script>
-
-</body>
-</html>
