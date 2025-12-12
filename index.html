@@ -26,12 +26,6 @@
         body { margin: 0; padding: 0; }
         .no-print { display: none; }
     }
-</style>
-</head>
-
-<body>
-<div id="root"></div>
-
 <script type="text/babel">
 
 // =======================================================
@@ -321,9 +315,33 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
         }
     }, [item.name]);
 
-    // 用於延遲關閉下拉選單，防止點擊建議時 onBlur 立即觸發
-    const dropdownRef = React.useRef(null);
     const inputRef = React.useRef(null);
+
+    // 🌟 修正篩選邏輯，確保能正確顯示建議清單 
+    const handleFilterSuggestions = (value) => {
+        if (!value.trim()) {
+            setSuggestions([]);
+            return;
+        }
+
+        const lowerValue = value.toLowerCase();
+
+        // 篩選：匹配品名包含輸入文字的所有項目
+        const filtered = specItems.filter(spec => 
+            spec.name && spec.name.toLowerCase().includes(lowerValue)
+        );
+
+        // 排序：讓以輸入文字開頭的項目優先顯示
+        const sorted = filtered.sort((a, b) => {
+            const aStarts = a.name.toLowerCase().startsWith(lowerValue);
+            const bStarts = b.name.toLowerCase().startsWith(lowerValue);
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        setSuggestions(sorted.slice(0, 10)); // 只顯示前 10 筆
+    }
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
@@ -331,18 +349,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
         if (name === 'name') {
             setSearchTerm(value);
             updateItem(item.id, { [name]: value });
-            
-            // 自動完成篩選邏輯：只匹配第一個字，且品名不能為空
-            if (value.trim().length > 0) {
-                const firstChar = value.trim().charAt(0);
-                const filtered = specItems.filter(spec => 
-                    spec.name && spec.name.startsWith(firstChar)
-                ).slice(0, 10); // 只顯示前 10 筆
-                setSuggestions(filtered);
-            } else {
-                setSuggestions([]);
-            }
-
+            handleFilterSuggestions(value); // 每次輸入都篩選
         } else {
             const finalValue = type === 'number' ? Number(value) : value; 
             updateItem(item.id, { [name]: finalValue });
@@ -366,9 +373,11 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
             specMaterial3: suggestion.specMaterial3 || '',
         });
         
-        // 確保輸入框失去焦點後不會再次彈出建議
+        // 確保輸入框失去焦點
         if (inputRef.current) {
              inputRef.current.blur();
+             // 確保選擇後立刻隱藏列表，並將焦點移開，防止閃爍
+             setTimeout(() => setSuggestions([]), 10);
         }
     };
     
@@ -381,8 +390,8 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                 const newImageSubItem = {
                     id: uuid(),
                     type: 'image',
-                    url: reader.result, // Base64 URL
-                    text: file.name // 檔名，但報價單上不顯示
+                    url: reader.result, 
+                    text: file.name
                 };
 
                 const newSubItems = [...(item.subItems || []), newImageSubItem];
@@ -426,7 +435,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                             // 延遲隱藏，給予時間點擊建議
                             setTimeout(() => setSuggestions([]), 200);
                         }}
-                        onFocus={handleChange} // 聚焦時也觸發一次篩選
+                        onFocus={() => handleFilterSuggestions(searchTerm)} // 聚焦時也觸發一次篩選
                         className="w-full border px-3 py-2 rounded focus:ring-blue-500 focus:border-blue-500" 
                         autoComplete="off"
                     />
@@ -434,8 +443,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                     {/* 自動完成下拉選單 */}
                     {suggestions.length > 0 && (
                         <div 
-                            ref={dropdownRef}
-                            className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
+                            className="absolute z-10 w-96 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto"
                         >
                             {suggestions.map((suggestion, idx) => (
                                 <div 
@@ -446,7 +454,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
                                     }}
                                     className="p-3 cursor-pointer hover:bg-blue-100 text-gray-800"
                                 >
-                                    {/* 顯示品名和規格 */}
+                                    {/* 顯示品名、規格、單位、單價 */}
                                     <div className="font-bold">{suggestion.name}</div>
                                     <div className="text-gray-500 text-sm">
                                         規格: {suggestion.specMain || 'N/A'} | 單位: {suggestion.unit || '式'} | 單價: {formatMoney(suggestion.price)}
@@ -545,7 +553,7 @@ function QuoteItemEditor({ item, updateItem, index, activeQuote, updateQuote }) 
 }
 
 // =======================================================
-// D3 — 報價單預覽組件 (新增功能)
+// D3 — 報價單預覽組件
 // =======================================================
 function QuotePreview({ quote, companyData }) {
     if (!quote) return null;
@@ -587,13 +595,13 @@ function PrintLayout({ quote, companyData }) {
         quote.negotiatedPrice
     );
     
-    // 判斷是否顯示議價後總價欄位 (新需求)
+    // 判斷是否顯示議價後總價欄位
     const showNegotiatedRow = Number(quote.discountPercent) > 0 || Number(quote.negotiatedPrice) > 0;
 
     return (
         <div style={{ padding: "10px", fontFamily: "Microsoft JhengHei, sans-serif" }}>
 
-            {/* 🌟 1. 公司全名稱置中顯示 (新需求) */}
+            {/* 🌟 1. 公司全名稱置中顯示 */}
             <h1 
                 style={{
                     fontSize: "28px", 
@@ -685,12 +693,13 @@ function PrintLayout({ quote, companyData }) {
                                     ) : null
                                 )}
 
-                                {/* ===== 3. 補充圖片 (新需求：圖片置中，不顯示名稱) ===== */}
+                                {/* ===== 3. 補充圖片 (修正：圖片置中，不顯示名稱) ===== */}
                                 {(item.subItems || [])
                                     .filter(s => s.type === "image" && s.url)
-                                    .map((s, imgIdx) => (
+                                    .map((s) => (
                                         <tr key={s.id + "_img"}>
                                             <td colSpan="8" style={{ ...td, textAlign: "center", padding: '15px' }}>
+                                                {/* 🌟 圖片置中修正：使用 display: block 和 margin: 0 auto */}
                                                 <img
                                                     src={s.url}
                                                     style={{
@@ -699,7 +708,9 @@ function PrintLayout({ quote, companyData }) {
                                                         height: 'auto',
                                                         width: 'auto',
                                                         border: "1px solid #ccc",
-                                                        objectFit: 'contain'
+                                                        objectFit: 'contain',
+                                                        display: 'block', // 關鍵：讓 margin: auto 生效
+                                                        margin: '0 auto'  // 關鍵：水平置中
                                                     }}
                                                     alt="補充圖片"
                                                 />
@@ -727,7 +738,7 @@ function PrintLayout({ quote, companyData }) {
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
                     </tr>
 
-                    {/* ===== 議價後總價行 (新需求：條件顯示) ===== */}
+                    {/* ===== 議價後總價行 (條件顯示) ===== */}
                     {showNegotiatedRow && (
                         <tr>
                             <td colSpan="7" style={tdRightBold}>議價後總價（未稅）</td>
