@@ -135,166 +135,117 @@ function generateQuoteNo(companyKey) {
 // =======================================================
 function AppProvider({ children }) {
 
-    const [company, setCompany] = React.useState("herhsin"); 
+    const [company, setCompany] = React.useState("herhsin");
     const [quotes, setQuotes] = React.useState([]);
     const [activeQuoteId, setActiveQuoteId] = React.useState(null);
 
-    /* Google Sheet — 材料規格品 */
     const [specItems, setSpecItems] = React.useState([]);
-    const [isLoadingSpecs, setIsLoadingSpecs] = React.useState(true); 
+    const [isLoadingSpecs, setIsLoadingSpecs] = React.useState(true);
 
-    // 原始 Google Sheet 連結 (export 格式，已確認最穩定)
-    const ORIGINAL_SPEC_URL = 
-        "https://docs.google.com/spreadsheets/d/1wjoNesgvgmkVoG4bI9ppl_1EktH88WZ6bxT9IeyX4YM/export?format=csv&gid=0";
-    
-    // CORS 代理服務：這是繞過瀏覽器跨域限制的關鍵
-    const CORS_PROXY = "https://corsproxy.io/?"; 
-    
-    // 組合最終請求 URL (將原始連結進行 URI 編碼，並作為參數傳給代理)
-    const SPEC_URL = CORS_PROXY + encodeURIComponent(ORIGINAL_SPEC_URL);
-
-
-    // ... (localStorage 讀取和寫入邏輯保持不變) ...
-    /* 讀取 localStorage */
+    // === 讀取 localStorage ===
     React.useEffect(() => {
-        // ... (省略不變的 localStorage 讀取邏輯) ...
+        const saved = localStorage.getItem("HERHSIN_QUOTES");
+        if (saved) {
+            const arr = JSON.parse(saved);
+            if (Array.isArray(arr)) {
+                setQuotes(arr);
+                if (arr.length > 0) setActiveQuoteId(arr[0].id);
+            }
+        }
     }, []);
 
-    /* 自動存回 localStorage */
+    // === 自動存回 localStorage ===
     React.useEffect(() => {
-        // ... (省略不變的 localStorage 寫入邏輯) ...
-    }, [quotes, activeQuoteId]);
+        localStorage.setItem("HERHSIN_QUOTES", JSON.stringify(quotes));
+    }, [quotes]);
 
-
-    /* 載入 Google Sheet (透過 CORS 代理) */
+    // === 載入 Google Sheet ===
     React.useEffect(() => {
         async function loadSpec() {
-            setIsLoadingSpecs(true);
             try {
-                // 1. 取得 CSV 文本 (現在是從 CORS 代理獲取，避免跨域問題)
-                const res = await fetch(SPEC_URL); 
-
-                if (!res.ok) {
-                    throw new Error(`HTTP 錯誤! Status: ${res.status}`);
-                }
+                const res = await fetch(
+                    "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/1wjoNesgvgmkVoG4bI9ppl_1EktH88WZ6bxT9IeyX4YM/export?format=csv&gid=0"
+                );
                 const text = await res.text();
-
-                // 2. 欄位映射
-                const headerMap = {
-                    "品名": "name",
-                    "單位": "unit",
-                    "單價": "price",
-                    "規格": "specMain",
-                    "用料1": "specMaterial",
-                    "用料2": "specMaterial2",
-                    "用料3": "specMaterial3",
-                };
-                const expectedColNames = Object.keys(headerMap);
-
-
-                // 3. 使用強健的 CSV 解析算法 (維持不變)
-                function parseCSV(csvText, expectedHeaders) {
-                    const list = [];
-                    const cleanText = csvText.replace(/\r/g, ''); 
-                    
-                    const regex = /(?:"([^"]*(?:""[^"]*)*)"|([^,]*))(?:,|$)/g;
-
-                    const rows = cleanText.split('\n').filter(r => r.trim().length > 0);
-                    if (rows.length < 1) return [];
-
-                    const headerRow = rows[0];
-                    let headers = [];
-                    let match;
-                    let tempRow = headerRow;
-
-                    // 解析標題行
-                    while ((match = regex.exec(tempRow)) !== null) {
-                        let field = match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2];
-                        headers.push(field ? field.trim().replace(/"/g, '') : '');
-                    }
-                    
-                    const expectedColCount = expectedHeaders.length;
-                    
-                    if (headers.length < expectedColCount || !expectedHeaders.every(h => headers.includes(h))) {
-                        console.error("❌ CSV 標題錯誤或欄位數不匹配！請確保第一行為：", expectedHeaders.join(', '));
-                        console.error("實際讀取到的標題：", headers.join(', '));
-                        return [];
-                    }
-
-                    // 開始解析資料行
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row.trim()) continue;
-
-                        const fields = [];
-                        let cursor = 0;
-                        while ((match = regex.exec(row.substring(cursor))) !== null) {
-                            cursor += match[0].length;
-                            let field = match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2];
-                            fields.push(field ? field.trim().replace(/"/g, '') : '');
-                            
-                            if (match[0].length === 0 && cursor < row.length) {
-                                cursor++; 
-                            }
-                        }
-                        
-                        while (fields.length < headers.length) {
-                            fields.push('');
-                        }
-
-
-                        if (fields.length !== headers.length) {
-                            console.warn(`警告: 第 ${i + 1} 行欄位數量不匹配 (預期:${headers.length}, 實際:${fields.length})，已跳過。原始行：${row.substring(0, 50)}...`);
-                            continue;
-                        }
-
-                        const obj = {};
-                        headers.forEach((h, j) => {
-                            const propName = headerMap[h] || h; 
-                            obj[propName] = fields[j];
-                        });
-                        
-                        obj.price = Number(obj.price) || 0;
-                        if (obj.name) {
-                            list.push(obj);
-                        }
-                    }
-
-                    return list;
-                }
-
-                const list = parseCSV(text, expectedColNames);
-                
-                if (list.length === 0 && !isLoadingSpecs) {
-                     alert("Google Sheet 載入成功，但解析後沒有找到有效的品項資料，請檢查表格內容和格式。");
-                }
-
+                const rows = text.split("\n").map(r => r.trim()).filter(r => r);
+                const header = rows[0].split(",");
+                const list = rows.slice(1).map(row => {
+                    const cols = row.split(",");
+                    const obj = {};
+                    header.forEach((h, i) => (obj[h] = cols[i]));
+                    return obj;
+                });
                 setSpecItems(list);
-                console.log(`✅ Google Sheet 資料載入成功！共 ${list.length} 筆項目。`);
-
-            } catch (err) {
-                console.error("❌ Google Sheet 載入或解析錯誤：", err);
-                alert("無法載入 Google Sheet 資料，請檢查：1. 您的網路連線； 2. Google Sheet 連結是否正確且已公開 '發布到網路'。");
+            } catch (e) {
+                console.error("載入 GoogleSheet 失敗", e);
             } finally {
                 setIsLoadingSpecs(false);
             }
         }
-
         loadSpec();
     }, []);
 
-    // ... (其餘函數和 Context 導出保持不變) ...
-    // (為節省空間，其餘部分省略，請確保您保留了 createQuote, deleteQuote, updateQuote 等函數)
+    // === CRUD 操作 ===
+    const createQuote = () => {
+        const newQuote = {
+            id: uuid(),
+            company,
+            quoteNo: generateQuoteNo(company),
+            title: "未命名工程",
+            customerName: "",
+            contact: "",
+            phone: "",
+            location: "",
+            date: new Date().toISOString().substring(0, 10),
+            items: [],
+            notes: DEFAULT_NOTES,
+            payment: DEFAULT_PAYMENT,
+            discountPercent: 0,
+            negotiatedPrice: 0
+        };
+        setQuotes(prev => [newQuote, ...prev]);
+        setActiveQuoteId(newQuote.id);
+    };
+
+    const deleteQuote = (id) => {
+        const newList = quotes.filter(q => q.id !== id);
+        setQuotes(newList);
+        if (activeQuoteId === id) {
+            setActiveQuoteId(newList.length ? newList[0].id : null);
+        }
+    };
+
+    const updateQuote = (id, update) => {
+        setQuotes(prev =>
+            prev.map(q => (q.id === id ? { ...q, ...update } : q))
+        );
+    };
+
+    const updateItem = (quoteId, itemList) => {
+        updateQuote(quoteId, { items: itemList });
+    };
 
     const activeQuote = quotes.find(q => q.id === activeQuoteId) || null;
 
+    // === AppContext.Provider 要輸出所有 App 會用到的資料，不能漏 ===
     return (
         <AppContext.Provider
             value={{
-                // ... (所有導出的值保持不變) ...
-                specItems, 
-                isLoadingSpecs, 
-                // ...
+                company,
+                setCompany,
+                quotes,
+                activeQuote,
+                activeQuoteId,
+                setActiveQuoteId,
+                createQuote,
+                deleteQuote,
+                updateQuote,
+                updateItem,
+                specItems,
+                isLoadingSpecs,
+
+                // ⬇ 這個是關鍵！App 會用到 COMPANY_DATA
+                COMPANY_DATA
             }}
         >
             {children}
