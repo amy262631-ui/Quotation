@@ -823,10 +823,13 @@ function PrintLayout({ quote, companyData }) {
 
 
 // =======================================================
-// D6 — 列印 PrintButton
+// D6 — 列印 PrintButton (修正：使用 renderToString 避免新窗口的 React 錯誤)
 // =======================================================
 function PrintButton() {
     const { activeQuote, COMPANY_DATA } = React.useContext(AppContext);
+
+    // 取得 renderToString 函式
+    const ReactDOMServer = window.ReactDOMServer;
     
     const handlePrint = () => {
         if (!activeQuote) {
@@ -840,13 +843,24 @@ function PrintButton() {
              return;
         }
 
+        if (!ReactDOMServer) {
+            alert("缺少 ReactDOMServer 庫，無法進行列印。請檢查 CDN 引入。");
+            return;
+        }
+
+        // 1. 將 PrintLayout 組件轉換為靜態 HTML 字串
+        // 由於我們在 AppProvider 之外，必須手動傳遞 props
+        const printHtmlString = ReactDOMServer.renderToString(
+             <PrintLayout quote={activeQuote} companyData={companyData} />
+        );
+
         const win = window.open("", "_blank");
         if (!win) {
              alert("請允許彈出視窗以便列印");
              return;
         }
         
-        // 寫入基礎 HTML 和樣式到新的列印窗口
+        // 2. 寫入基礎 HTML、樣式和靜態內容到新的列印窗口
         win.document.write(`
             <html>
             <head>
@@ -859,30 +873,29 @@ function PrintButton() {
                         font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; 
                         color: #000;
                     }
+                    /* 確保表格在分頁時不會被切斷 */
                     table { page-break-inside: auto; }
                     tr    { page-break-inside: avoid; page-break-after: auto; }
-                    
-                    .print-container {
-                        max-width: 100%;
-                        margin: 0;
-                        padding: 0;
-                    }
                 </style>
             </head>
-            <body><div class="print-container"></div></body>
+            <body>
+                <div class="print-container" style="max-width: 794px; margin: 0 auto; padding: 0;">
+                    ${printHtmlString}
+                </div>
+            </body>
             </html>
         `);
         win.document.close();
 
-        // 使用 ReactDOM 將 PrintLayout 渲染到新的窗口
-        const container = win.document.querySelector(".print-container");
-        const printRoot = ReactDOM.createRoot(container); 
-        printRoot.render(<PrintLayout quote={activeQuote} companyData={companyData} />);
-
-        // 等待渲染完成後再執行列印
+        // 3. 執行列印 (給瀏覽器一點時間加載樣式)
         setTimeout(() => {
             win.print();
-        }, 500);
+        }, 50); // 這裡的時間可以縮短很多，因為不需要等待 React 渲染
+
+        // 4. 關閉窗口 (可選)
+        setTimeout(() => {
+             win.close();
+        }, 3000); // 延遲關閉，給予使用者列印操作時間
     };
 
     return (
@@ -894,7 +907,6 @@ function PrintButton() {
         </button>
     );
 }
-
 
 // =======================================================
 // D6 — PDF 產生 ExportPDFButton
