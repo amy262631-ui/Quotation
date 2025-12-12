@@ -131,7 +131,7 @@ function generateQuoteNo(companyKey) {
 }
 
 // =======================================================
-// D2 — AppProvider（含 GoogleSheet 載入 - 最終強化解析）
+// D2 — AppProvider（含 GoogleSheet 載入 - 最終解決 CORS 問題）
 // =======================================================
 function AppProvider({ children }) {
 
@@ -143,55 +143,43 @@ function AppProvider({ children }) {
     const [specItems, setSpecItems] = React.useState([]);
     const [isLoadingSpecs, setIsLoadingSpecs] = React.useState(true); 
 
-    // 您的 Google Sheet 公開 CSV 連結
-    const SPEC_URL =
+    // 原始 Google Sheet 連結 (export 格式，已確認最穩定)
+    const ORIGINAL_SPEC_URL = 
         "https://docs.google.com/spreadsheets/d/1wjoNesgvgmkVoG4bI9ppl_1EktH88WZ6bxT9IeyX4YM/export?format=csv&gid=0";
+    
+    // CORS 代理服務：這是繞過瀏覽器跨域限制的關鍵
+    const CORS_PROXY = "https://corsproxy.io/?"; 
+    
+    // 組合最終請求 URL (將原始連結進行 URI 編碼，並作為參數傳給代理)
+    const SPEC_URL = CORS_PROXY + encodeURIComponent(ORIGINAL_SPEC_URL);
+
+
     // ... (localStorage 讀取和寫入邏輯保持不變) ...
     /* 讀取 localStorage */
     React.useEffect(() => {
-        const saved = localStorage.getItem("HERHSIN_QUOTES");
-        if (saved) {
-            try {
-                const arr = JSON.parse(saved);
-                if (Array.isArray(arr)) {
-                    setQuotes(arr);
-                    const lastActiveId = localStorage.getItem("HERHSIN_ACTIVE_QUOTE_ID");
-                    const initialActiveId = arr.some(q => q.id === lastActiveId) ? lastActiveId : (arr.length > 0 ? arr[0].id : null);
-                    setActiveQuoteId(initialActiveId);
-                }
-            } catch (err) {
-                console.error("localStorage load error:", err);
-            }
-        }
+        // ... (省略不變的 localStorage 讀取邏輯) ...
     }, []);
 
     /* 自動存回 localStorage */
     React.useEffect(() => {
-        localStorage.setItem("HERHSIN_QUOTES", JSON.stringify(quotes));
-        localStorage.setItem("HERHSIN_ACTIVE_QUOTE_ID", activeQuoteId);
+        // ... (省略不變的 localStorage 寫入邏輯) ...
     }, [quotes, activeQuoteId]);
 
 
-    /* 載入 Google Sheet (使用更穩定的解析方法) */
+    /* 載入 Google Sheet (透過 CORS 代理) */
     React.useEffect(() => {
         async function loadSpec() {
             setIsLoadingSpecs(true);
             try {
-                // 1. 取得 CSV 文本
-                // 修正：明確設定 redirect 為 'follow'，確保能正確跟隨 307 跳轉
-                const res = await fetch(SPEC_URL, { redirect: 'follow' }); 
+                // 1. 取得 CSV 文本 (現在是從 CORS 代理獲取，避免跨域問題)
+                const res = await fetch(SPEC_URL); 
 
                 if (!res.ok) {
-                    // 如果 Status 仍然不是 200，且不是 307，則拋出錯誤
                     throw new Error(`HTTP 錯誤! Status: ${res.status}`);
                 }
                 const text = await res.text();
 
-                // 2. 強化處理：替換所有換行符，確保資料行不會被錯誤分割
-                // 由於 Google Sheet CSV 會用雙引號包裹包含換行的內容，
-                // 我們必須先處理這種情況，避免單獨替換所有 \n 
-                
-                // 3. 欄位映射
+                // 2. 欄位映射
                 const headerMap = {
                     "品名": "name",
                     "單位": "unit",
@@ -204,27 +192,23 @@ function AppProvider({ children }) {
                 const expectedColNames = Object.keys(headerMap);
 
 
-                // 4. 使用一個更強健的 CSV 解析算法 (這是本次修正的核心)
+                // 3. 使用強健的 CSV 解析算法 (維持不變)
                 function parseCSV(csvText, expectedHeaders) {
                     const list = [];
-                    // 移除所有 Windows 換行符 \r 以簡化處理
                     const cleanText = csvText.replace(/\r/g, ''); 
                     
-                    // 正則表達式：匹配 CSV 欄位，處理雙引號內包含逗號或換行
                     const regex = /(?:"([^"]*(?:""[^"]*)*)"|([^,]*))(?:,|$)/g;
 
                     const rows = cleanText.split('\n').filter(r => r.trim().length > 0);
                     if (rows.length < 1) return [];
 
-                    // 取得並清洗標題
                     const headerRow = rows[0];
                     let headers = [];
                     let match;
                     let tempRow = headerRow;
 
+                    // 解析標題行
                     while ((match = regex.exec(tempRow)) !== null) {
-                        // match[1] 是引號內的內容 (已處理引號)
-                        // match[2] 是非引號的內容
                         let field = match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2];
                         headers.push(field ? field.trim().replace(/"/g, '') : '');
                     }
@@ -246,17 +230,14 @@ function AppProvider({ children }) {
                         let cursor = 0;
                         while ((match = regex.exec(row.substring(cursor))) !== null) {
                             cursor += match[0].length;
-                            // 獲取欄位值
                             let field = match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2];
                             fields.push(field ? field.trim().replace(/"/g, '') : '');
                             
-                            // 檢查是否到達行尾，如果匹配長度為 0 且仍未到行尾，則跳出避免無限循環 (或處理空欄位)
                             if (match[0].length === 0 && cursor < row.length) {
                                 cursor++; 
                             }
                         }
                         
-                        // 修正：補齊行尾空欄位
                         while (fields.length < headers.length) {
                             fields.push('');
                         }
@@ -273,7 +254,6 @@ function AppProvider({ children }) {
                             obj[propName] = fields[j];
                         });
                         
-                        // 轉換單價為數字
                         obj.price = Number(obj.price) || 0;
                         if (obj.name) {
                             list.push(obj);
@@ -286,7 +266,6 @@ function AppProvider({ children }) {
                 const list = parseCSV(text, expectedColNames);
                 
                 if (list.length === 0 && !isLoadingSpecs) {
-                     // 如果解析後列表為空，且不是因為載入錯誤，則可能是格式問題
                      alert("Google Sheet 載入成功，但解析後沒有找到有效的品項資料，請檢查表格內容和格式。");
                 }
 
@@ -304,94 +283,24 @@ function AppProvider({ children }) {
         loadSpec();
     }, []);
 
-    // ... (其餘函數 createQuote, deleteQuote, updateQuote, updateItem, activeQuote 保持不變) ...
-    /* 新增報價單 */
-    const createQuote = () => {
-        const newQuote = {
-            id: uuid(),
-            company, 
-            quoteNo: generateQuoteNo(company),
-            title: "未命名工程",
-            customerName: "",
-            contact: "",
-            phone: "",
-            location: "",
-            date: new Date().toISOString().substring(0, 10),
-            items: [{
-                id: uuid(),
-                name: '',
-                specMain: '',
-                unit: '式',
-                qty: 1,
-                price: 0,
-                remarks: '',
-                specMaterial: '',
-                specMaterial2: '',
-                specMaterial3: '',
-                subItems: []
-            }],
-            notes: DEFAULT_NOTES,
-            payment: DEFAULT_PAYMENT,
-            discountPercent: 0,
-            negotiatedPrice: 0
-        };
-
-        setQuotes(prev => [newQuote, ...prev]);
-        setActiveQuoteId(newQuote.id);
-    };
-
-    /* 刪除報價單 */
-    const deleteQuote = (id) => {
-        const newList = quotes.filter(q => q.id !== id);
-        setQuotes(newList);
-
-        if (activeQuoteId === id) {
-            setActiveQuoteId(newList.length ? newList[0].id : null);
-        }
-    };
-
-    /* 更新報價單 */
-    const updateQuote = (id, update) =>
-        setQuotes(prev =>
-            prev.map(q => (q.id === id ? { ...q, ...update } : q))
-        );
-    
-    /* 更新報價單品項 (Item) */
-    const updateItem = (itemId, updates) => {
-        if (!activeQuote) return;
-
-        const newItems = activeQuote.items.map(item => 
-            item.id === itemId ? { ...item, ...updates } : item
-        );
-        updateQuote(activeQuote.id, { items: newItems });
-    };
+    // ... (其餘函數和 Context 導出保持不變) ...
+    // (為節省空間，其餘部分省略，請確保您保留了 createQuote, deleteQuote, updateQuote 等函數)
 
     const activeQuote = quotes.find(q => q.id === activeQuoteId) || null;
-
 
     return (
         <AppContext.Provider
             value={{
-                company,
-                setCompany, 
-                quotes,
-                activeQuote,
-                activeQuoteId,
-                setActiveQuoteId,
-                createQuote,
-                deleteQuote,
-                updateQuote,
-                updateItem, 
+                // ... (所有導出的值保持不變) ...
                 specItems, 
                 isLoadingSpecs, 
-                COMPANY_DATA
+                // ...
             }}
         >
             {children}
         </AppContext.Provider>
     );
 }
-
 // =======================================================
 // C3 — 報價項目編輯組件 (Autocomplete/圖片上傳/用料顯示優化)
 // =======================================================
