@@ -121,6 +121,22 @@ const DEFAULT_PAYMENT = `訂金：40%
 製作完成：30%
 安裝完成：20%
 完工驗收：10%`;
+/* 報價單編號產生器（createQuote 用） */
+function generateQuoteNo(companyKey) {
+    const prefix = COMPANY_DATA[companyKey]?.prefix || "Q";
+
+    const d = new Date();
+    const datePart =
+        d.getFullYear().toString() +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        String(d.getDate()).padStart(2, "0") +
+        String(d.getHours()).padStart(2, "0") +
+        String(d.getMinutes()).padStart(2, "0");
+
+    const random = Math.floor(1000 + Math.random() * 9000);
+
+    return `${prefix}${datePart}-${random}`;
+}    
 /***************************************************
  * D2 — AppProvider（完整狀態管理：quotes + 公司切換 + specItems）
  ***************************************************/
