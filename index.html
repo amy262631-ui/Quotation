@@ -1226,6 +1226,31 @@ function App() {
                 <PrintButton quote={activeQuote} />
                 <ExportPDFButton quote={activeQuote} />
             </div>
+            {/* 即時預覽區 */}
+<QuotePreview quote={activeQuote} />
+        </div>
+    );
+}
+/***************************************************
+ * D10 — 報價單即時預覽區（取代原本 renderToString 預覽）
+ ***************************************************/
+function QuotePreview({ quote }) {
+    if (!quote) return null;
+
+    return (
+        <div className="mt-10 p-6 bg-white shadow-lg border rounded">
+            <h2 className="text-xl font-bold mb-3">📄 報價單預覽（即時）</h2>
+            <div className="scale-90 origin-top-left border shadow p-4 bg-white">
+                <PrintLayout
+                    quote={quote}
+                    totalAmount={calcTotal(quote.items)}
+                    negotiatedAmount={calcNegotiated(
+                        calcTotal(quote.items),
+                        quote.discountPercent,
+                        quote.negotiatedPrice
+                    )}
+                />
+            </div>
         </div>
     );
 }
