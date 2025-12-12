@@ -131,7 +131,7 @@ function generateQuoteNo(companyKey) {
 }
 
 // =======================================================
-// D2 — AppProvider（含 GoogleSheet 載入）
+// D2 — AppProvider（含 GoogleSheet 載入 - 強化 CSV 解析）
 // =======================================================
 function AppProvider({ children }) {
 
@@ -141,11 +141,13 @@ function AppProvider({ children }) {
 
     /* Google Sheet — 材料規格品 */
     const [specItems, setSpecItems] = React.useState([]);
+    const [isLoadingSpecs, setIsLoadingSpecs] = React.useState(true); // 新增載入狀態
 
-    // 這裡使用您 Google Sheet 的公開 CSV 連結
+    // 您的 Google Sheet 公開 CSV 連結 (必須確認連結正確且表單已公開)
     const SPEC_URL =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?gid=0&single=true&output=csv";
 
+    // ... (localStorage 讀取和寫入邏輯保持不變) ...
     /* 讀取 localStorage */
     React.useEffect(() => {
         const saved = localStorage.getItem("HERHSIN_QUOTES");
@@ -170,16 +172,29 @@ function AppProvider({ children }) {
         localStorage.setItem("HERHSIN_ACTIVE_QUOTE_ID", activeQuoteId);
     }, [quotes, activeQuoteId]);
 
-    /* 載入 Google Sheet (修正 CSV 解析，確保資料穩定) */
+
+    /* 載入 Google Sheet (使用更穩定的解析方法) */
     React.useEffect(() => {
         async function loadSpec() {
+            setIsLoadingSpecs(true);
             try {
+                // 1. 取得 CSV 文本
                 const res = await fetch(SPEC_URL);
+                if (!res.ok) {
+                    throw new Error(`HTTP 錯誤! Status: ${res.status}`);
+                }
                 const text = await res.text();
 
-                // 處理 CSV 格式，特別是帶有逗號的欄位（如規格）
+                // 2. 準備解析
                 const rows = text.split("\n").map(r => r.trim()).filter(r => r.length);
-                const header = rows[0].split(",").map(h => h.trim());
+                if (rows.length < 2) {
+                    console.warn("CSV 檔案中沒有找到資料行 (可能只有標題)");
+                    setIsLoadingSpecs(false);
+                    return;
+                }
+
+                // 3. 標頭定義 (確保大小寫與 Sheet 吻合)
+                const header = rows[0].split(",").map(h => h.trim().replace(/"/g, ''));
 
                 const headerMap = {
                     "品名": "name",
@@ -191,14 +206,25 @@ function AppProvider({ children }) {
                     "用料3": "specMaterial3",
                 };
 
-                const list = rows.slice(1).map(row => {
-                    // 使用正規表達式來解析 CSV 行，處理引號內的逗號
+                const list = [];
+                const expectedColCount = header.length;
+                
+                // 4. 解析每一行資料
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    // 使用更精確的正規表達式來解析 CSV 行，處理引號內的逗號 (更穩定)
                     const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g); 
-                    if (!cols || cols.length !== header.length) return null; 
+                    
+                    if (!cols || cols.length !== expectedColCount) {
+                        console.warn(`警告: 第 ${i + 1} 行欄位數量不匹配 (預期:${expectedColCount}, 實際:${cols ? cols.length : 0})，已跳過。`);
+                        continue;
+                    } 
 
                     const obj = {};
-                    header.forEach((h, i) => {
-                        let val = cols[i] || "";
+                    let isValid = true;
+
+                    header.forEach((h, j) => {
+                        let val = cols[j] || "";
                         // 移除欄位前後的引號
                         val = val.replace(/^"|"$/g, "");
                         
@@ -207,18 +233,26 @@ function AppProvider({ children }) {
                     });
                     
                     obj.price = Number(obj.price) || 0;
-                    return obj;
-                }).filter(Boolean); // 移除解析失敗的行
+                    if (obj.name) { // 確保品名不為空
+                        list.push(obj);
+                    }
+                }
 
                 setSpecItems(list);
+                console.log(`✅ Google Sheet 資料載入成功！共 ${list.length} 筆項目。`);
+
             } catch (err) {
-                console.error("Google Sheet 載入錯誤：", err);
+                console.error("❌ Google Sheet 載入或解析錯誤：", err);
+                alert("無法載入 Google Sheet 資料，請檢查：1. 您的網路連線； 2. Google Sheet 連結是否正確且已公開 '發布到網路'。");
+            } finally {
+                setIsLoadingSpecs(false);
             }
         }
 
         loadSpec();
     }, []);
 
+    // ... (其餘函數 createQuote, deleteQuote, updateQuote, updateItem 保持不變) ...
     /* 新增報價單 */
     const createQuote = () => {
         const newQuote = {
@@ -282,6 +316,7 @@ function AppProvider({ children }) {
 
     const activeQuote = quotes.find(q => q.id === activeQuoteId) || null;
 
+
     return (
         <AppContext.Provider
             value={{
@@ -296,6 +331,7 @@ function AppProvider({ children }) {
                 updateQuote,
                 updateItem, 
                 specItems, 
+                isLoadingSpecs, // 提供載入狀態
                 COMPANY_DATA
             }}
         >
