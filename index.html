@@ -793,53 +793,50 @@ function ExportPDFButton({ quote }) {
  * D7 — PrintLayout（A4 列印模板）
  ***************************************************/
 function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
+
     if (!quote) return null;
 
     const company = COMPANY_DATA[quote.company] || COMPANY_DATA.herhsin;
 
     return (
         <div style={{
-            width: "760px",
-            fontFamily: "Microsoft JhengHei",
+            width: "794px",   // A4 寬度 (px)
             padding: "20px",
+            fontFamily: "Microsoft JhengHei",
             color: "#000"
         }}>
 
-            {/* ===== 公司抬頭 ===== */}
-            <h1 style={{ fontSize: "26px", fontWeight: "bold", textAlign: "center" }}>
+            {/* ======= 公司抬頭 ======= */}
+            <h1 style={{ fontSize: "28px", fontWeight: "bold", textAlign: "center" }}>
                 {company.name}
             </h1>
 
-            <div style={{ textAlign: "center", marginBottom: "12px" }}>
+            <div style={{ textAlign: "center", marginBottom: "10px" }}>
                 電話：{company.tel}　地址：{company.address}
             </div>
 
             <h2 style={{
-                fontSize: "22px",
+                fontSize: "24px",
+                fontWeight: "bold",
                 textAlign: "center",
-                margin: "15px 0",
-                fontWeight: "bold"
+                margin: "20px 0"
             }}>
                 報　價　單
             </h2>
 
-            {/* ===== 客戶資料 ===== */}
-            <table style={{ width: "100%", marginBottom: "16px" }}>
+            {/* ======= 客戶資料 ======= */}
+            <table style={{ width: "100%", fontSize: "14px", marginBottom: "15px" }}>
                 <tbody>
                     <tr>
-                        <td>客戶名稱：</td>
-                        <td>{quote.customerName}</td>
-                        <td>聯絡人：</td>
-                        <td>{quote.contact}</td>
+                        <td>客戶名稱：</td><td>{quote.customerName}</td>
+                        <td>聯絡人：</td><td>{quote.contact}</td>
                     </tr>
                     <tr>
-                        <td>電話：</td>
-                        <td>{quote.phone}</td>
-                        <td>報價日期：</td>
-                        <td>{quote.date}</td>
+                        <td>電話：</td><td>{quote.phone}</td>
+                        <td>報價日期：</td><td>{quote.date}</td>
                     </tr>
                     <tr>
-                        <td>工程地點：</td>
+                        <td>工程地址：</td>
                         <td colSpan="3">{quote.location}</td>
                     </tr>
                     <tr>
@@ -849,8 +846,8 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                 </tbody>
             </table>
 
-            {/* ===== 報價明細 ===== */}
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            {/* ======= 報價明細 ======= */}
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
                 <thead>
                     <tr>
                         <th style={th}>項次</th>
@@ -865,32 +862,26 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
 
                 <tbody>
                     {quote.items.map((item, idx) => {
+
                         const subtotal = item.qty * item.price;
 
                         return (
                             <React.Fragment key={item.id}>
 
-                                {/* === 主項 === */}
+                                {/* ===== 主項 ===== */}
                                 <tr>
                                     <td style={tdCenter}>{idx + 1}</td>
                                     <td style={tdLeft}>{item.name}</td>
 
+                                    {/* ===== 規格 + 用料分行 ===== */}
                                     <td style={tdLeft}>
                                         {item.specMain}
 
-                                        {item.specMaterial && (
-                                            <div style={{ fontSize: "12px" }}>
-                                                用料1：{item.specMaterial}
-                                            </div>
-                                        )}
-                                        {item.specMaterial2 && (
-                                            <div style={{ fontSize: "12px" }}>
-                                                用料2：{item.specMaterial2}
-                                            </div>
-                                        )}
-                                        {item.specMaterial3 && (
-                                            <div style={{ fontSize: "12px" }}>
-                                                用料3：{item.specMaterial3}
+                                        {(item.specMaterial || item.specMaterial2 || item.specMaterial3) && (
+                                            <div style={{ marginTop: "4px", fontSize: "12px" }}>
+                                                <span>用料1：{item.specMaterial || "-"}</span>　
+                                                <span>用料2：{item.specMaterial2 || "-"}</span>　
+                                                <span>用料3：{item.specMaterial3 || "-"}</span>
                                             </div>
                                         )}
                                     </td>
@@ -901,13 +892,13 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                                     <td style={tdRight}>{formatMoney(subtotal)}</td>
                                 </tr>
 
-                                {/* === 子項：備註 === */}
-                                {(item.subItems || []).map((sub) => {
+                                {/* ===== 子項目（備註） ===== */}
+                                {item.subItems?.map(sub => {
                                     if (sub.type === "note") {
                                         return (
-                                            <tr key={sub.id + "-note"}>
+                                            <tr key={sub.id + "_note"}>
                                                 <td colSpan="7" style={tdNote}>
-                                                    備註：{sub.text}
+                                                    補充說明：{sub.text}
                                                 </td>
                                             </tr>
                                         );
@@ -915,24 +906,21 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
 
                                     if (sub.type === "image" && sub.url) {
                                         return (
-                                            <tr key={sub.id + "-img"}>
+                                            <tr key={sub.id + "_img"}>
                                                 <td colSpan="7" style={tdNote}>
-                                                    <div>補充圖片：</div>
                                                     <img
                                                         src={sub.url}
                                                         style={{
-                                                            maxWidth: "300px",
-                                                            marginTop: "8px",
-                                                            border: "1px solid #999"
+                                                            maxWidth: "500px",
+                                                            marginTop: "10px",
+                                                            border: "1px solid #ccc"
                                                         }}
                                                     />
                                                 </td>
                                             </tr>
                                         );
                                     }
-                                    return null;
                                 })}
-
                             </React.Fragment>
                         );
                     })}
@@ -943,24 +931,44 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount }) {
                         <td style={tdRightBold}>{formatMoney(totalAmount)}</td>
                     </tr>
 
-                    {/* 議價後總價 */}
                     <tr>
                         <td colSpan="6" style={tdRightBold}>議價後總價（未稅）</td>
                         <td style={tdRightBold}>{formatMoney(negotiatedAmount)}</td>
                     </tr>
+
                 </tbody>
             </table>
 
-            {/* ===== 備註 ===== */}
-            <div style={{ marginTop: "20px", fontSize: "14px" }}>
+            {/* ======= 備註 ======= */}
+            <div style={{ marginTop: "30px", fontSize: "14px" }}>
                 <strong>備註：</strong>
-                <pre style={{ whiteSpace: "pre-wrap" }}>{quote.notes}</pre>
+                <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px", marginTop: "5px" }}>
+{quote.notes}
+                </pre>
             </div>
 
-            {/* ===== 章戳 ===== */}
-            <div style={{ marginTop: "20px", textAlign: "right" }}>
-                <img src={company.stamp} className="stamp" />
+            {/* ======= 付款條件 ======= */}
+            <div style={{ marginTop: "20px", fontSize: "14px" }}>
+                <strong>付款條件：</strong>
+                <pre style={{ whiteSpace: "pre-wrap", fontSize: "13px", marginTop: "5px" }}>
+{quote.payment}
+                </pre>
             </div>
+
+            {/* ======= 客戶回簽區 ======= */}
+            <div style={{ marginTop: "40px", fontSize: "14px", borderTop: "1px solid #000", paddingTop: "10px" }}>
+                <strong>客戶確認：</strong><br /><br />
+                客戶簽名：______________________　　日期：__________/__________/__________
+            </div>
+
+            {/* ======= 印章 ======= */}
+            <div style={{ marginTop: "30px", textAlign: "right" }}>
+                <img
+                    src={company.stamp}
+                    style={{ width: "180px", opacity: 0.9 }}
+                />
+            </div>
+
         </div>
     );
 }
