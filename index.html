@@ -1,1037 +1,2004 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工程報價系統（何鑫 / 薪昌）- Final V1</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工程報價系統（Herhsin & SinChang）- V29 修正版</title>
 
-    <!-- Tailwind -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-    <!-- React 18 -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    body {
+      background: #f3f4f6;
+      font-family: "Microsoft JhengHei", sans-serif;
+    }
 
-    <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    /* 1. 修正：預設隱藏列印專用區塊，
+      解決「畫面跑出兩個預覽」的問題 
+    */
+    .print-only-layout {
+      display: none;
+    }
 
-    <!-- XLSX for Excel Export -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+   /* =================================================
+       ✅ 修正後的列印專用 CSS
+    ================================================= */
+    @media print {
+      /* 1. 強制重置所有容器，取消 Flex 排版 */
+      body, 
+      #root, 
+      .quote-editor-root-container, 
+      div {
+        display: block !important; /* 關鍵：取消 flex，改為區塊 */
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: static !important;
+        background: white;
+      }
 
-    <style>
-        body {
-            font-family: "Microsoft JhengHei", sans-serif;
-            background: #f6f7f9;
-        }
+      /* 2. 隱藏不需要列印的元素 */
+      .no-print,
+      .live-preview-box,
+      aside, /* 如果側邊欄是用 aside */
+      nav {
+        display: none !important;
+      }
 
-        @media print {
-            .no-print { display: none !important; }
+      /* 3. 設定列印區域滿版 */
+      .print-only-layout {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box; /* 確保 padding 不會撐大寬度 */
+      }
 
-            body {
-                margin: 0;
-                padding: 0;
-                background: white;
-            }
+      /* 4. 表格設定 */
+      table {
+        width: 100% !important;
+        border-collapse: collapse;
+        table-layout: fixed; /* 讓欄位寬度依照設定的 % 跑，不要被內容撐開或壓縮 */
+      }
 
-            #printArea {
-                display: block !important;
-                width: 210mm;
-                min-height: 297mm;
-                padding: 10mm 12mm;
-                margin: auto;
-                background: white;
-                font-size: 12px;
-            }
+      thead {
+        display: table-header-group;
+      }
 
-            table {
-                border-collapse: collapse;
-            }
-            th, td {
-                border: 1px solid black;
-                padding: 4px;
-                vertical-align: top;
-            }
-        }
+      tr {
+        page-break-inside: avoid;
+      }
 
-        #printArea {
-            display: none;
-        }
-    </style>
+      /* 5. 確保文字不會因為太擠而變直向 */
+      td, th {
+        white-space: normal; /* 允許換行 */
+        word-wrap: break-word; /*長單字換行*/
+        vertical-align: middle; /* 垂直置中 */
+      }
+
+      .print-footer-block,
+      .print-signature-area {
+        page-break-inside: avoid;
+      }
+
+      @page {
+        size: A4;
+        margin: 10mm; /* 邊距設為 10mm，讓空間更大 */
+      }
+    }
+  </style>
 </head>
 
 <body class="text-gray-900">
-    <div id="root"></div>
-    <div id="printArea"></div>
-<script type="text/babel">    
-/***********************************************************
- * 全域資料中心 AppContext
- ***********************************************************/
-const AppContext = React.createContext();
+  <div id="root"></div>
 
-/* 兩間公司資料 */
+  <script type="text/babel">
+
+/***********************************************************
+ * P1 — 公司資料 / 備註 / 付款條件 / 模式模板
+ ***********************************************************/
 const COMPANY_DATA = {
-    herhsin: {
-        name: "何鑫實業股份有限公司",
-        prefix: "QH",
-        tel: "07-6521927",
-        fax: "07-6517994",
-        address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "https://amy262631-ui.github.io/Quotation/herhsin_stamp.JPG"
-    },
-    sinchang: {
-        name: "薪昌股份有限公司",
-        prefix: "QS",
-        tel: "07-6521927",
-        fax: "07-6517994",
-        address: "831高雄市大寮區鳳屏二路383-8號",
-        stamp: "https://amy262631-ui.github.io/Quotation/sinchang_stamp.JPG"
-    }
+  herhsin: {
+    name: "何鑫實業股份有限公司",
+    taxId: "76380260",  
+    tel: "07-6521927",
+    fax: "07-6517994",
+    email: "affairs@herhsin.com",
+    address: "831高雄市大寮區鳳屏二路383-8號",
+    stamp: "https://amy262631-ui.github.io/Quotation/herhsin_stamp.JPG",
+    prefix: "QH",
+  },
+  sinchang: {
+    name: "薪昌股份有限公司",
+    taxId: "53896738",
+    tel: "07-6521927",
+    fax: "07-6517994",
+    email: "affairs@herhsin.com",
+    address: "831高雄市大寮區鳳屏二路383-8號",
+    stamp: "https://amy262631-ui.github.io/Quotation/sinchang_stamp.JPG",
+    prefix: "QS",
+  },
 };
 
-/* Google Sheet CSV 來源 */
-const SPEC_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHQN_nMBB7l72PSD8omOO55UYRlIClUGEDgtzYzTKK-5fvRWIZowcdnMHvkkwJbdz7krhIiRc00sye/pub?output=csv";
+const DEFAULT_NOTES = `1. 本報價未含加值稅。
+2. 安裝施作時需注意現場作業環境。
+3. 報價單有效期限為 15 天。
+4. 若遇不可抗力因素造成延誤，工期順延。
+5. 料件須由本公司提供與安裝，否則不在保固範圍內。
+6. 付款條件依雙方合約內容為準。`;
 
-/* 輔助函式 */
+const DEFAULT_PAYMENT = `訂金：40%
+製作完成：30%
+安裝完成：20%
+完工驗收：10%`;
+ 
+/***********************************************************
+ * 報價模式模板（QUOTE_MODES）— 已新增實支實付零件預設值
+ ***********************************************************/
+const QUOTE_MODES = [
+  {
+    id: "mode_leak_repair",
+    name: "拌合機漏漿更換工程",
+    description: "拌合機漏漿修復，包工包料項目另計，零件實支實付",
+    
+    // 1. 主要工程項目 (維持原本設定)
+    defaultItems: [
+      {
+        name: "更換 3m³ 拌合機【減速機側】漏漿（含工資及材料）",
+        unit: "式",
+        qty: 1,
+        price: 0,
+        specMain: "含拆裝、調整、測試",
+        specMaterial: "",
+        remarks: "",
+        type: "main",
+        subItems: []
+      },
+      {
+        name: "更換 3m³ 拌合機【非減速機側】漏漿（含工資及材料）",
+        unit: "式",
+        qty: 1,
+        price: 0,
+        specMain: "含拆裝、調整、測試",
+        specMaterial: "",
+        remarks: "",
+        type: "main",
+        subItems: []
+      }
+    ],
+
+    // ▼▼▼ 2. 新增：實支實付零件預設清單 (可自由修改) ▼▼▼
+    defaultLeakageParts: [
+      { name: "聯軸器 (台製)", spec: "台灣製造", unit: "組", price: 30000 },
+      { name: "聯軸器 (德製)", spec: "德國原裝", unit: "組", price: 58000 },
+      { name: "聯軸器橡膠墊圈 (台製)", spec: "台灣製造", unit: "只", price: 2000 },
+      { name: "聯軸器橡膠墊圈 (德製)", spec: "德國原裝", unit: "只", price: 9500 },
+      { name: "減速機鬆緊器", spec: "絞接螺栓及插銷", unit: "式", price: 5000 },
+      { name: "減速機支撐調整器", spec: "吊眼螺絲", unit: "式", price: 3150 },
+      { name: "油封", spec: "TC 140x180x14", unit: "只", price: 350 },
+      { name: "軸承", spec: "型號：23124", unit: "只", price: 8000 },
+      { name: "主軸套筒", spec: "120x140x120", unit: "式", price: 2600 },
+      { name: "鍵槽組", spec: "平鍵 32x18x315L 及斜鍵 10x7x50", unit: "式", price: 1800 },
+      { name: "O型環", spec: "3x120x126", unit: "只", price: 200 },
+      { name: "假日施工加價", spec: "非工作日出勤費用", unit: "式", price: 15000 },
+    ],
+    // ▲▲▲ 新增結束 ▲▲▲
+
+    referenceItems: [],
+    defaultNotes: DEFAULT_NOTES,
+    defaultPayment: DEFAULT_PAYMENT
+  },
+  {
+    id: "modeB",
+    name: "設備銷售",
+    description: "適用備品、單機銷售與安裝。",
+    defaultItems: [],
+    defaultNotes: DEFAULT_NOTES,
+    defaultPayment: DEFAULT_PAYMENT
+  },
+  {
+    id: "modeC",
+    name: "設備更換工程",
+    description: "適用整機更新、料件更換工程。",
+    defaultItems: [],
+    defaultNotes: DEFAULT_NOTES,
+    defaultPayment: DEFAULT_PAYMENT
+  }
+];
+
+/***********************************************************
+  * P2 — 工具函式
+ ***********************************************************/
 function uuid() {
-    return "xxxx-4xxx-yxxx-xxxx".replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        const v = c === "x" ? r : (r & 0x3 | 0x8);
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
         return v.toString(16);
     });
 }
 
-function today() {
-    const d = new Date();
-    return d.toISOString().slice(0, 10);
+function formatDate(dateStr = new Date()) {
+    const d = dateStr instanceof Date ? dateStr : new Date(dateStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
 }
 
-function generateQuoteNo(companyKey) {
-    const prefix = COMPANY_DATA[companyKey].prefix;
-    const t = new Date();
-    const stamp =
-        t.getFullYear().toString() +
-        (t.getMonth() + 1).toString().padStart(2, "0") +
-        t.getDate().toString().padStart(2, "0") +
-        t.getHours().toString().padStart(2, "0") +
-        t.getMinutes().toString().padStart(2, "0");
-    return `${prefix}${stamp}-${Math.floor(Math.random() * 900 + 100)}`;
+function formatMoney(num) {
+    if (num === "" || num === null || num === undefined || isNaN(Number(num))) return "0"; 
+    return Number(num).toLocaleString("zh-TW", { maximumFractionDigits: 0 });
 }
 
-/* 解析 Google CSV */
-async function loadCSV(url) {
-    const res = await fetch(url);
-    const txt = await res.text();
-    const rows = txt.split("\n").map(r => r.trim());
-    const header = rows[0].split(",");
-
-    return rows.slice(1).map(row => {
-        const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-        const get = i => (cols[i] || "").replace(/"/g, "").trim();
-
-        return {
-            name: get(0),
-            unit: get(1),
-            price: Number(get(2)) || 0,
-            originalSpec: get(3),
-            mat1: get(4),
-            mat2: get(5),
-            mat3: get(6)
-        };
-    });
-}
-
-/***********************************************************
- * AppProvider：管理所有報價單資料
- ***********************************************************/
-function AppProvider({ children }) {
-    const [company, setCompany] = React.useState("herhsin");
-    const [quotes, setQuotes] = React.useState([]);
-    const [activeId, setActiveId] = React.useState(null);
-    const [specList, setSpecList] = React.useState([]);
-
-    /* 初始化載入 localStorage */
-    React.useEffect(() => {
-        const saved = localStorage.getItem("HERHSIN_QUOTES_V1");
-        if (saved) {
-            const arr = JSON.parse(saved);
-            setQuotes(arr);
-            if (arr.length > 0) setActiveId(arr[0].id);
-        }
-    }, []);
-
-    /* 同步 localStorage */
-    React.useEffect(() => {
-        localStorage.setItem("HERHSIN_QUOTES_V1", JSON.stringify(quotes));
-    }, [quotes]);
-
-    /* 載入 GoogleSheet 內容 */
-    React.useEffect(() => {
-        loadCSV(SPEC_CSV_URL).then(setSpecList);
-    }, []);
-
-    /* 建立新報價單 */
-    const createQuote = () => {
-        const q = {
-            id: uuid(),
-            company,
-            quoteNo: generateQuoteNo(company),
-            title: "未命名工程",
-            customer: "",
-            contact: "",
-            phone: "",
-            location: "",
-            date: today(),
-            items: [],
-            notes: `本報價單未含加值稅。\n安裝施作時需注意現場環境。\n報價有效期限為 15 天。\n材料須由本公司供應與安裝，否則不在保固範圍內。`,
-            payment: `訂金：40%\n製作完成：30%\n安裝完成：20%\n完工驗收：10%`
-        };
-
-        setQuotes(prev => [q, ...prev]);
-        setActiveId(q.id);
-    };
-
-    /* 刪除報價單 */
-    const deleteQuote = (id) => {
-        const list = quotes.filter(q => q.id !== id);
-        setQuotes(list);
-        if (list.length > 0) setActiveId(list[0].id);
-    };
-
-    /* 複製報價單 */
-    const copyQuote = (id) => {
-        const q = quotes.find(x => x.id === id);
-        if (!q) return;
-        const newQ = {
-            ...structuredClone(q),
-            id: uuid(),
-            quoteNo: generateQuoteNo(q.company),
-            date: today()
-        };
-        setQuotes(prev => [newQ, ...prev]);
-        setActiveId(newQ.id);
-    };
-
-    /* 更新報價單（部分欄位） */
-    const updateQuote = (id, data) => {
-        setQuotes(prev =>
-            prev.map(q => q.id === id ? { ...q, ...data } : q)
-        );
-    };
-
-    const activeQuote = quotes.find(q => q.id === activeId);
-
-    /* Context */
-    const ctx = {
-        company,
-        setCompany,
-        quotes,
-        activeQuote,
-        activeId,
-        setActiveId,
-        createQuote,
-        deleteQuote,
-        copyQuote,
-        updateQuote,
-        specList
-    };
-
-    return (
-        <AppContext.Provider value={ctx}>
-            {children}
-        </AppContext.Provider>
-    );
-}
-/***********************************************************
- * 工具函式（計算金額、格式化、用料合併）
- ***********************************************************/
-
-/* 計算小計 */
 function calcAmount(item) {
     const qty = Number(item.qty || 0);
     const price = Number(item.price || 0);
     return qty * price;
 }
 
-/* 計算整張報價單金額 */
 function calcTotal(items) {
-    return items.reduce((sum, it) => sum + calcAmount(it), 0);
+    return items.reduce((sum, it) => {
+        if (it.type === "reference") return sum;
+
+        let mainAmt = calcAmount(it);
+        let subs = 0;
+
+        if (it.subItems && it.subItems.length > 0) {
+            subs = it.subItems.reduce(
+                (s, sub) => (sub.type === "item" ? s + calcAmount(sub) : s),
+                0
+            );
+        }
+
+        return sum + mainAmt + subs;
+    }, 0);
 }
 
-/* 最終金額（若有輸入 negotiatedPrice 就直接採用） */
-function calcFinal(total, discountPercent, customPrice) {
+function calcNegotiated(total, discountPercent, customPrice) {
     const cp = Number(customPrice || 0);
     const dp = Number(discountPercent || 0);
-
+    
     if (cp > 0) return cp;
-
-    if (dp > 0) {
+    
+    if (dp > 0 && dp <= 100) {
         return Math.round(total * (1 - dp / 100));
     }
+    
     return total;
 }
 
-/* 數字格式化（千分位） */
-function formatMoney(num) {
-    if (!num) return "0";
-    return Number(num).toLocaleString("zh-TW");
-}
+function generateQuoteNo(companyKey = "sinchang") {
+  const prefix = COMPANY_DATA[companyKey]?.prefix || "QS";
 
-/* 合併用料（你指定使用 Q1=A → 一行呈現） */
-function mergeMaterials(mat1, mat2, mat3) {
-    const arr = [];
-    if (mat1) arr.push(mat1);
-    if (mat2) arr.push(mat2);
-    if (mat3) arr.push(mat3);
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
 
-    if (arr.length === 0) return "";
-    return `用料明細：${arr.join("、")}`;
-}
-/***********************************************************
- * 左側 UI（公司切換 + 報價單列表）
- ***********************************************************/
+  const dateKey = `${yy}${mm}${dd}`;
+  const storageKey = `quote_seq_${companyKey}_${dateKey}`;
 
-/* 公司切換 */
-function CompanySelector() {
-    const { company, setCompany } = React.useContext(AppContext);
+  let seq = Number(localStorage.getItem(storageKey) || "0") + 1;
 
-    return (
-        <div className="mb-6">
-            <h2 className="font-bold mb-2">選擇公司</h2>
+  if (seq > 99) {
+    alert("今日報價單已超過 99 張，請確認");
+    seq = 99;
+  }
 
-            <div className="flex gap-2">
-                <button
-                    className={`px-3 py-1 rounded ${
-                        company === "herhsin"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-300 hover:bg-gray-400"
-                    }`}
-                    onClick={() => setCompany("herhsin")}
-                >
-                    何鑫
-                </button>
+  localStorage.setItem(storageKey, seq);
 
-                <button
-                    className={`px-3 py-1 rounded ${
-                        company === "sinchang"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-300 hover:bg-gray-400"
-                    }`}
-                    onClick={() => setCompany("sinchang")}
-                >
-                    薪昌
-                </button>
-            </div>
-        </div>
-    );
+  const nn = String(seq).padStart(2, "0");
+  return `${prefix}${dateKey}${nn}`;
 }
 
 
-/* 報價單列表 */
-function QuoteList() {
-    const {
-        quotes,
-        activeId,
-        setActiveId,
-        createQuote,
-        copyQuote,
-        deleteQuote
-    } = React.useContext(AppContext);
+async function loadCSV(url) {
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
+        
+        const rows = text.split("\n").map(r => r.trim()).filter(r => r.length > 0);
+        if (rows.length < 2) return [];
+        
+        const header = rows[0].split(",").map(h => h.trim().replace(/"/g, ''));
 
-    return (
-        <div className="mt-6">
-            <div className="flex justify-between mb-2">
-                <h2 className="font-bold">報價單列表</h2>
-                <button
-                    className="text-xs bg-green-600 text-white px-2 py-1 rounded"
-                    onClick={createQuote}
-                >
-                    + 新增
-                </button>
-            </div>
+        return rows.slice(1).map(row => {
+            const cols = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+            const obj = {};
 
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {quotes.length === 0 && (
-                    <div className="text-gray-400 text-sm">尚無報價單</div>
-                )}
-
-                {quotes.map(q => (
-                    <div
-                        key={q.id}
-                        className={`p-2 border rounded cursor-pointer flex justify-between items-center ${
-                            q.id === activeId
-                                ? "bg-blue-50 border-blue-500"
-                                : "bg-white hover:bg-gray-50"
-                        }`}
-                        onClick={() => setActiveId(q.id)}
-                    >
-                        <div className="text-sm">
-                            <div className="font-bold">{q.title}</div>
-                            <div className="text-gray-500 text-xs">{q.quoteNo}</div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button
-                                className="text-xs text-blue-600 hover:underline"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    copyQuote(q.id);
-                                }}
-                            >
-                                複製
-                            </button>
-
-                            <button
-                                className="text-xs text-red-600 hover:underline"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    if (confirm("確定刪除？")) deleteQuote(q.id);
-                                }}
-                            >
-                                刪除
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-/***********************************************************
- * 報價項目編輯器（含 GoogleSheet 自動帶資料 + 圖片）
- ***********************************************************/
-
-function QuoteItem({ item, index, updateItem, deleteItem, specList }) {
-    const [show, setShow] = React.useState(true);
-    const [query, setQuery] = React.useState(item.name || "");
-    const [filtered, setFiltered] = React.useState([]);
-    const [showDropdown, setShowDropdown] = React.useState(false);
-
-    /* 關鍵字搜尋 Google Sheet */
-    React.useEffect(() => {
-        if (!query || query.trim() === "") {
-            setFiltered([]);
-            return;
-        }
-        const q = query.trim().toLowerCase();
-
-        const f = specList.filter(x =>
-            x.name.toLowerCase().includes(q)
-        );
-
-        setFiltered(f.slice(0, 20)); // 最多顯示 20 筆
-    }, [query, specList]);
-
-    /* 點擊搜尋結果（自動帶資料） */
-    const applySpec = (sp) => {
-        const mergedMat = mergeMaterials(sp.mat1, sp.mat2, sp.mat3);
-
-        updateItem({
-            name: sp.name,
-            unit: sp.unit,
-            price: sp.price,
-            originalSpec: sp.originalSpec,
-            specMain: sp.originalSpec, // 可被覆蓋
-            specMaterial: mergedMat,   // 用料明細合併後
+            header.forEach((h, i) => {
+                let value = cols[i] ? cols[i].trim() : "";
+                if (value.startsWith('"') && value.endsWith('"')) {
+                    value = value.substring(1, value.length - 1);
+                }
+                obj[h] = value;
+            });
+            return obj;
         });
-
-        setQuery(sp.name);
-        setShowDropdown(false);
-    };
-
-    /* 新增補充圖片 */
-    const addPicture = () => {
-        const pics = item.pictures || [];
-        const newList = [...pics, { id: uuid(), url: "" }];
-        updateItem({ pictures: newList });
-    };
-
-    /* 更新圖片網址 */
-    const updatePicture = (id, url) => {
-        const pics = item.pictures || [];
-        const newList = pics.map(p => p.id === id ? { ...p, url } : p);
-        updateItem({ pictures: newList });
-    };
-
-    /* 刪除圖片 */
-    const deletePicture = (id) => {
-        const pics = item.pictures || [];
-        const newList = pics.filter(p => p.id !== id);
-        updateItem({ pictures: newList });
-    };
-
-    return (
-        <div className="mb-4 border p-3 rounded bg-white shadow-sm">
-
-            {/* 項次 + 刪除按鈕 */}
-            <div className="flex justify-between items-center mb-2">
-                <div className="font-bold text-lg">項次 {index + 1}</div>
-
-                <div className="flex gap-2">
-                    <button
-                        className="text-xs border px-2 py-1 rounded"
-                        onClick={() => setShow(!show)}
-                    >
-                        {show ? "收合" : "展開"}
-                    </button>
-
-                    <button
-                        className="text-xs bg-red-500 text-white px-2 py-1 rounded"
-                        onClick={() => deleteItem(item.id)}
-                    >
-                        刪除
-                    </button>
-                </div>
-            </div>
-
-            {/* 內容區 */}
-            {show && (
-                <div className="space-y-4">
-
-                    {/* 品名 + 自動完成 */}
-                    <div className="relative">
-                        <label className="text-sm font-semibold">品名（自動帶資料）</label>
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={e => {
-                                setQuery(e.target.value);
-                                updateItem({ name: e.target.value });
-                                setShowDropdown(true);
-                            }}
-                            onFocus={() => setShowDropdown(true)}
-                            className="w-full border p-2 rounded"
-                        />
-
-                        {showDropdown && filtered.length > 0 && (
-                            <div className="absolute z-20 bg-white border w-full max-h-60 overflow-y-auto rounded shadow">
-                                {filtered.map((sp, i) => (
-                                    <div
-                                        key={i}
-                                        className="px-3 py-2 hover:bg-blue-100 cursor-pointer text-sm"
-                                        onClick={() => applySpec(sp)}
-                                    >
-                                        {sp.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 圖片區 */}
-                    <div>
-                        <div className="flex justify-between items-center mb-1">
-                            <label className="text-sm font-semibold">品名圖片</label>
-                            <button
-                                onClick={addPicture}
-                                className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                            >
-                                + 新增圖片
-                            </button>
-                        </div>
-
-                        <div className="space-y-2">
-                            {(item.pictures || []).map(pic => (
-                                <div key={pic.id} className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        className="flex-grow border p-1 rounded"
-                                        placeholder="圖片網址"
-                                        value={pic.url}
-                                        onChange={e => updatePicture(pic.id, e.target.value)}
-                                    />
-                                    <button
-                                        onClick={() => deletePicture(pic.id)}
-                                        className="text-red-500 text-xs"
-                                    >
-                                        移除
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 規格 */}
-                    <div>
-                        <label className="text-sm font-semibold">規格（可覆蓋）</label>
-                        <textarea
-                            className="w-full border p-2 rounded"
-                            rows={2}
-                            value={item.specMain || ""}
-                            onChange={e => updateItem({ specMain: e.target.value })}
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                            原始規格：{item.originalSpec || "（無）"}
-                        </div>
-                    </div>
-
-                    {/* 用料（已合併） */}
-                    <div>
-                        <label className="text-sm font-semibold">用料明細（可編輯）</label>
-                        <textarea
-                            className="w-full border p-2 rounded"
-                            rows={2}
-                            value={item.specMaterial || ""}
-                            onChange={e => updateItem({ specMaterial: e.target.value })}
-                        />
-                    </div>
-
-                    {/* 單位、數量、單價、小計 */}
-                    <div className="grid grid-cols-4 gap-4">
-                        <div>
-                            <label className="text-sm">單位</label>
-                            <input
-                                className="w-full border p-2 rounded"
-                                value={item.unit || ""}
-                                onChange={e => updateItem({ unit: e.target.value })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-sm">數量</label>
-                            <input
-                                type="number"
-                                className="w-full border p-2 rounded"
-                                value={item.qty || 0}
-                                onChange={e => updateItem({ qty: Number(e.target.value) })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-sm">單價</label>
-                            <input
-                                type="number"
-                                className="w-full border p-2 rounded"
-                                value={item.price || 0}
-                                onChange={e => updateItem({ price: Number(e.target.value) })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-sm">小計</label>
-                            <div className="w-full border p-2 rounded bg-gray-100 text-right">
-                                {formatMoney(calcAmount(item))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 備註 */}
-                    <div>
-                        <label className="text-sm font-semibold">備註</label>
-                        <textarea
-                            className="w-full border p-2 rounded"
-                            rows={2}
-                            value={item.remarks || ""}
-                            onChange={e => updateItem({ remarks: e.target.value })}
-                        />
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-/***********************************************************
- * 列印版 PrintLayout（A4 版面 + 圖片）
- ***********************************************************/
-
-function PrintLayout({ quote }) {
-
-    if (!quote) return null;
-
-    const companyData = COMPANY_DATA[quote.company];
-    const total = calcTotal(quote.items);
-
-    return (
-        <div className="p-6 text-black text-[12px] leading-relaxed">
-
-            {/* =============== 標題區 =============== */}
-            <div className="text-center mb-4">
-                <div className="text-2xl font-bold">{companyData.name}</div>
-                <div className="text-xl font-bold mt-1">工程報價單</div>
-            </div>
-
-            {/* =============== 客戶資訊區塊 =============== */}
-            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                    <div>客戶名稱：{quote.customer}</div>
-                    <div>連絡人：{quote.contact}</div>
-                    <div>連絡電話：{quote.phone}</div>
-                </div>
-                <div>
-                    <div>工程名稱：{quote.title}</div>
-                    <div>安裝地點：{quote.location}</div>
-                    <div>報價日期：{quote.date}</div>
-                    <div>報價單號：{quote.quoteNo}</div>
-                </div>
-            </div>
-
-            {/* =============== 表格 =============== */}
-            <table className="w-full text-sm mb-4">
-                <thead>
-                    <tr className="font-bold text-center">
-                        <th className="w-10">項次</th>
-                        <th className="w-52">品名（含圖片）</th>
-                        <th className="w-64">規格 / 用料明細</th>
-                        <th className="w-10">單位</th>
-                        <th className="w-10">數量</th>
-                        <th className="w-16">單價</th>
-                        <th className="w-20">小計</th>
-                        <th className="w-32">備註</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {quote.items.map((it, idx) => (
-                        <tr key={it.id} className="align-top">
-                            {/* 項次 */}
-                            <td className="text-center">{idx + 1}</td>
-
-                            {/* 品名 + 圖片 */}
-                            <td>
-                                <div className="font-bold mb-1">{it.name}</div>
-
-                                {(it.pictures || []).map((pic) =>
-                                    pic.url ? (
-                                        <img
-                                            key={pic.id}
-                                            src={pic.url}
-                                            alt="pic"
-                                            style={{
-                                                width: "120px",
-                                                marginBottom: "4px"
-                                            }}
-                                        />
-                                    ) : null
-                                )}
-                            </td>
-
-                            {/* 規格 + 用料明細 */}
-                            <td>
-                                {it.specMain}
-                                <br />
-                                {it.specMaterial && (
-                                    <span className="text-gray-700">
-                                        {it.specMaterial}
-                                    </span>
-                                )}
-                            </td>
-
-                            {/* 單位 / 數量 / 單價 / 小計 */}
-                            <td className="text-center">{it.unit}</td>
-                            <td className="text-center">{it.qty}</td>
-                            <td className="text-right">{formatMoney(it.price)}</td>
-                            <td className="text-right">{formatMoney(calcAmount(it))}</td>
-
-                            {/* 備註 */}
-                            <td>{it.remarks}</td>
-                        </tr>
-                    ))}
-
-                    {/* =============== 合計 =============== */}
-                    <tr className="font-bold">
-                        <td colSpan="6" className="text-right pr-2">總計：</td>
-                        <td className="text-right">{formatMoney(total)}</td>
-                        <td></td>
-                    </tr>
-                </tbody>
-            </table>
-
-            {/* =============== 備註 + 付款條件 =============== */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-                <div>
-                    <div className="font-bold mb-1">備註：</div>
-                    <div className="whitespace-pre-line">{quote.notes}</div>
-                </div>
-
-                <div>
-                    <div className="font-bold mb-1">付款條件：</div>
-                    <div className="whitespace-pre-line">{quote.payment}</div>
-                </div>
-            </div>
-
-            {/* =============== 蓋章 & 簽名區 =============== */}
-            <div className="grid grid-cols-2 mt-8">
-                <div className="text-center">
-                    <div className="font-bold mb-2">公司蓋章</div>
-                    <img
-                        src={companyData.stamp}
-                        alt="stamp"
-                        style={{ width: "140px", opacity: 0.95 }}
-                    />
-                </div>
-
-                <div className="text-center">
-                    <div className="font-bold mb-2">客戶簽名</div>
-                    <div style={{
-                        width: "200px",
-                        height: "100px",
-                        border: "1px solid black",
-                        margin: "0 auto"
-                    }}></div>
-                </div>
-            </div>
-        </div>
-    );
-}
-/***********************************************************
- * 匯出 Excel
- ***********************************************************/
-function exportExcel(quote) {
-    if (!quote) {
-        alert("尚未選擇報價單");
-        return;
+    } catch (error) {
+        console.error("載入或解析 Google Sheet CSV 失敗:", error);
+        return [];
     }
+}
 
-    const wb = XLSX.utils.book_new();
+/***********************************************************
+ * P3 — AppContext（資料中心）
+ ***********************************************************/
+const AppContext = React.createContext();
 
-    // 表格資料
-    const wsData = [
-        ["項次", "品名", "規格", "用料明細", "單位", "數量", "單價", "小計", "備註"]
-    ];
+function AppProvider({ children }) {
+  const [company, setCompany] = React.useState("herhsin");
+  const [quotes, setQuotes] = React.useState([]);
+  const [activeQuoteId, setActiveQuoteId] = React.useState(null);
+  const [specItems, setSpecItems] = React.useState([]);
 
-    quote.items.forEach((it, idx) => {
-        wsData.push([
-            idx + 1,
-            it.name || "",
-            it.specMain || "",
-            it.specMaterial || "",
-            it.unit || "",
-            it.qty || 0,
-            it.price || 0,
-            calcAmount(it),
-            it.remarks || ""
-        ]);
+  const SPEC_CSV_URL =
+    "https://docs.google.com/spreadsheets/d/1wjoNesgvgmkVoG4bI9ppl_1EktH88WZ6bxT9IeyX4YM/export?format=csv";
+
+  const loadSpecItems = React.useCallback(() => {
+    loadCSV(SPEC_CSV_URL).then(data => setSpecItems(data));
+  }, []);
+
+  React.useEffect(() => {
+    loadSpecItems();
+  }, [loadSpecItems]);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem("HERHSIN_QUOTES");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setQuotes(parsed);
+          if (parsed.length > 0) setActiveQuoteId(parsed[0].id);
+        }
+      } catch (e) {
+        setQuotes([]);
+        setActiveQuoteId(null);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem("HERHSIN_QUOTES", JSON.stringify(quotes));
+  }, [quotes]);
+
+  /* ========================================================
+     1. 建立新報價單 (createQuote)
+     更新重點：新增讀取 leakageParts (實支實付零件) 的邏輯
+     ======================================================== */
+  const createQuote = React.useCallback((modeId) => {
+    const mode = QUOTE_MODES.find(m => m.id === modeId);
+    
+    // 1. 處理主項目 (給予全新 ID)
+    const defaultItems = mode 
+      ? JSON.parse(JSON.stringify(mode.defaultItems)).map(item => ({
+          ...item,
+          id: uuid() 
+        }))
+      : [];
+
+    // ▼▼▼ 2. 新增：處理實支實付零件 (如果有設定的話) ▼▼▼
+    const defaultLeakageParts = (mode && mode.defaultLeakageParts)
+      ? JSON.parse(JSON.stringify(mode.defaultLeakageParts)).map(part => ({
+          ...part,
+          id: uuid() // 一樣給予全新 ID，讓您可以自由刪減
+        }))
+      : [];
+
+    const newQuote = {
+        id: uuid(),
+        company: company,
+        quoteNo: generateQuoteNo(company),
+        title: "",
+        customerName: "",
+        contact: "",
+        phone: "",
+        location: "",
+        date: formatDate(),
+        items: defaultItems,
+        leakageParts: defaultLeakageParts, // ⭐ 把零件存進報價單裡
+        notes: mode ? mode.defaultNotes : DEFAULT_NOTES,
+        payment: mode ? mode.defaultPayment : DEFAULT_PAYMENT,
+        discountPercent: 0,
+        negotiatedPrice: 0
+    };
+
+    setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+  }, [company]);
+
+  /* ========================================================
+     2. 刪除報價單 (deleteQuote) - 維持不變
+     ======================================================== */
+  const deleteQuote = React.useCallback((id) => {
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    if (activeQuoteId === id) setActiveQuoteId(null);
+  }, [activeQuoteId]);
+/* ========================================================
+     新增功能：複製報價單 (duplicateQuote)
+     ======================================================== */
+  const duplicateQuote = React.useCallback((id) => {
+    // 1. 找到原本那張單
+    const sourceQuote = quotes.find(q => q.id === id);
+    if (!sourceQuote) return;
+
+    // 2. 深層複製 (Deep Copy) 並賦予新身分
+    // 我們用 JSON.parse(JSON.stringify(...)) 來切斷與舊資料的連結
+    const newQuote = {
+      ...JSON.parse(JSON.stringify(sourceQuote)), 
+      id: uuid(),                                // 給全新的 ID
+      quoteNo: generateQuoteNo(sourceQuote.company), // 給全新的報價單號
+      title: `${sourceQuote.title} (副本)`,       // 標題加上 (副本) 方便辨識
+      date: formatDate(),                        // 更新成今天的日期
+      
+      // 確保裡面的項目也有新 ID (避免 React 報錯 key 重複)
+      items: sourceQuote.items.map(item => ({
+         ...item,
+         id: uuid()
+      })),
+      leakageParts: (sourceQuote.leakageParts || []).map(part => ({
+         ...part,
+         id: uuid()
+      }))
+    };
+
+    // 3. 存入列表並選取它
+    setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+  }, [quotes]);
+  /* ========================================================
+     3. 更新報價單 (updateQuote) - 維持不變
+     ======================================================== */
+  const updateQuote = React.useCallback((id, data) => {
+    setQuotes(prev => prev.map(q => q.id === id ? { ...q, ...data } : q));
+  }, []);
+
+  /* ========================================================
+     4. 套用模式 (applyMode)
+     更新重點：套用時也要把 leakageParts 抓進來
+     ======================================================== */
+  const applyMode = React.useCallback((modeId) => {
+    if (!activeQuoteId) return;
+    const mode = QUOTE_MODES.find(m => m.id === modeId);
+    if (!mode) return;
+
+    if (!window.confirm("確定要覆蓋當前報價單內容嗎？此動作無法復原。")) return;
+
+    // 主項目
+    const newItems = JSON.parse(JSON.stringify(mode.defaultItems)).map(item => ({
+        ...item,
+        id: uuid() 
+    }));
+    
+    // ▼▼▼ 新增：套用零件 ▼▼▼
+    const newLeakageParts = (mode.defaultLeakageParts)
+      ? JSON.parse(JSON.stringify(mode.defaultLeakageParts)).map(part => ({
+          ...part,
+          id: uuid()
+        }))
+      : [];
+
+    updateQuote(activeQuoteId, {
+        items: newItems,
+        leakageParts: newLeakageParts, // ⭐ 更新零件列表
+        notes: mode.defaultNotes,
+        payment: mode.defaultPayment
     });
+  }, [activeQuoteId, updateQuote]);
 
-    wsData.push([]);
-    wsData.push(["", "", "", "", "", "", "總計", calcTotal(quote.items)]);
+  const activeQuote = quotes.find(q => q.id === activeQuoteId);
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, "報價明細");
+  const value = {
+    company,
+    setCompany,
+    quotes,
+    setQuotes,
+    activeQuote,
+    activeQuoteId,
+    setActiveQuoteId,
+    specItems,
+    loadSpecItems,
+    createQuote,
+    deleteQuote,
+    updateQuote,
+    applyMode
+  };
 
-    XLSX.writeFile(wb, `${quote.quoteNo}.xlsx`);
+  window.__APP_CONTEXT__ = value;
+
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
+
 /***********************************************************
- * 列印功能
+ * P4-1 — 公司切換 / 模式選擇 / 報價單列表
  ***********************************************************/
-function printQuote(quote) {
-    if (!quote) {
-        alert("尚未選擇報價單");
-        return;
+function CompanySelector() {
+  const { company, setCompany, activeQuote, updateQuote } = React.useContext(AppContext);
+
+  const handleSetCompany = (newCompany) => {
+    setCompany(newCompany);
+    if (activeQuote) {
+      updateQuote(activeQuote.id, {
+        company: newCompany,
+        quoteNo: generateQuoteNo(newCompany)
+      });
     }
+  };
 
-    const printArea = document.getElementById("printArea");
-    ReactDOM.render(<PrintLayout quote={quote} />, printArea);
+  return (
+    <div className="mb-8 no-print">
+      <div className="text-base font-semibold text-gray-700 mb-3">
+        選擇公司
+      </div>
 
-    setTimeout(() => {
-        window.print();
-    }, 200);
+      <div className="flex gap-3">
+        <button
+          className={`flex-1 px-4 py-2 text-base rounded-md transition ${
+            company === "herhsin"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => handleSetCompany("herhsin")}
+        >
+          何鑫實業
+        </button>
+
+        <button
+          className={`flex-1 px-4 py-2 text-base rounded-md transition ${
+            company === "sinchang"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => handleSetCompany("sinchang")}
+        >
+          薪昌股份有限公司
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModeSelector() {
+  const { createQuote, applyMode } = React.useContext(AppContext);
+
+  const [selectedMode, setSelectedMode] = React.useState("");
+  const [isNew, setIsNew] = React.useState(true);
+
+  const handleApply = () => {
+    if (!selectedMode) return;
+    isNew ? createQuote(selectedMode) : applyMode(selectedMode);
+    setSelectedMode("");
+  };
+
+  return (
+    <div className="mb-8 pb-6 border-b border-gray-300 no-print">
+      <div className="text-base font-semibold text-gray-700 mb-3">
+        模式套用（{isNew ? "新建" : "覆蓋"}）
+      </div>
+
+      <div className="flex gap-3 mb-4">
+        <button
+          className={`flex-1 px-4 py-2 text-base rounded-md ${
+            isNew
+              ? "bg-green-600 text-white"
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => setIsNew(true)}
+        >
+          新建報價單
+        </button>
+
+        <button
+          className={`flex-1 px-4 py-2 text-base rounded-md ${
+            !isNew
+              ? "bg-orange-600 text-white"
+              : "bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => setIsNew(false)}
+        >
+          套用至當前
+        </button>
+      </div>
+
+      <select
+        className="w-full border px-3 py-2 mb-4 rounded-md text-base"
+        value={selectedMode}
+        onChange={e => setSelectedMode(e.target.value)}
+      >
+        <option value="" disabled>請選擇報價模式</option>
+        {QUOTE_MODES.map(mode => (
+          <option key={mode.id} value={mode.id}>
+            {mode.name} — {mode.description}
+          </option>
+        ))}
+      </select>
+
+      <button
+        className="w-full bg-blue-600 text-white py-2.5 rounded-md text-base hover:bg-blue-700 disabled:opacity-50"
+        onClick={handleApply}
+        disabled={!selectedMode}
+      >
+        {isNew ? "新建報價單並套用模式" : "套用模式至當前報價單"}
+      </button>
+    </div>
+  );
+}
+
+/* ========================================================
+   組件：報價單列表 (QuoteList) — 升級版
+   功能：顯示列表、支援切換、刪除、複製
+   ======================================================== */
+function QuoteList({ quotes, activeId, selectQuote, deleteQuote, duplicateQuote }) {
+  // 1. 如果沒有單據，顯示提示
+  if (!quotes || quotes.length === 0) {
+    return (
+        <div className="text-gray-400 text-sm text-center mt-10 p-4 border-2 border-dashed border-gray-200 rounded-lg">
+            尚無報價單<br/>請由上方選擇模式新增
+        </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 pb-20"> {/* pb-20 是為了避免被底部擋住 */}
+      {quotes.map((quote) => (
+        <div
+          key={quote.id}
+          onClick={() => selectQuote(quote.id)}
+          className={`p-4 rounded-lg cursor-pointer border transition-all relative group ${
+            quote.id === activeId
+              ? "bg-blue-50 border-blue-500 shadow-md ring-1 ring-blue-500"
+              : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm"
+          }`}
+        >
+          {/* 上排：公司標籤 + 單號 */}
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+               {/* 公司標籤：根據公司代號變色 */}
+               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-white ${
+                   quote.company === 'herhsin' ? 'bg-blue-600' : 'bg-green-600'
+               }`}>
+                 {quote.company === 'herhsin' ? '何鑫' : '薪昌'}
+               </span>
+               <span className="text-xs text-gray-400 font-mono">
+                 {quote.quoteNo}
+               </span>
+            </div>
+          </div>
+
+          {/* 中排：標題 */}
+          <div className="font-bold text-gray-800 mb-1 text-sm truncate pr-4">
+            {quote.title || "（未命名工程）"}
+          </div>
+
+          {/* 下排：客戶 + 日期 */}
+          <div className="text-xs text-gray-500 flex justify-between items-center mt-2 border-t pt-2 border-gray-100">
+             <span className="truncate max-w-[60%]">{quote.customerName || "未知客戶"}</span>
+             <span>{quote.date}</span>
+          </div>
+
+          {/* ▼▼▼ 懸浮按鈕區 (滑鼠移過去才會出現) ▼▼▼ */}
+          <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
+             {/* 📋 複製按鈕 */}
+             <button
+                onClick={(e) => {
+                  e.stopPropagation(); // 阻止點擊觸發「選取報價單」
+                  duplicateQuote(quote.id);
+                }}
+                className="p-1.5 bg-white text-gray-500 border border-gray-200 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-400 shadow-sm transition-colors"
+                title="複製此報價單 (建立副本)"
+             >
+                📋
+             </button>
+
+             {/* ✕ 刪除按鈕 */}
+             <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if(window.confirm(`確定要刪除單號 ${quote.quoteNo} 嗎？此動作無法復原。`)) {
+                      deleteQuote(quote.id);
+                  }
+                }}
+                className="p-1.5 bg-white text-gray-400 border border-gray-200 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-400 shadow-sm transition-colors"
+                title="刪除"
+             >
+                ✕
+             </button>
+          </div>
+
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /***********************************************************
- * 主畫面：右側編輯器
+ * P4-2 — 單一報價項目編輯（緊湊優化版）
  ***********************************************************/
+function QuoteItem({ item, index, updateItem, deleteItem }) {
+  const { specItems } = React.useContext(AppContext);
+  // 移除原本的 showSub state，改用 HTML原生 <details> 標籤處理展開
+
+  /* --- 邏輯保持不變 --- */
+  const handleChange = (field, value) => {
+    updateItem({ [field]: value });
+  };
+
+  const handleAddSubText = () => {
+    const newSub = {
+      id: uuid(),
+      type: "text",
+      name: "",
+      remarks: ""
+    };
+    updateItem({ subItems: [...(item.subItems || []), newSub] });
+  };
+
+  const handleAddSubImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const newSub = {
+        id: uuid(),
+        type: "image",
+        name: "",
+        imageData: reader.result
+      };
+      updateItem({ subItems: [...(item.subItems || []), newSub] });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteSub = (subId) => {
+    const newSubItems = item.subItems.filter(s => s.id !== subId);
+    updateItem({ subItems: newSubItems });
+  };
+
+  const handleUpdateSub = (subId, field, value) => {
+    const newSubItems = item.subItems.map(s => 
+      s.id === subId ? { ...s, [field]: value } : s
+    );
+    updateItem({ subItems: newSubItems });
+  };
+
+  return (
+    <div className="mb-3 border rounded-lg bg-white shadow-sm overflow-hidden text-sm">
+      
+      {/* ===== 第一區：核心輸入 (預設顯示) ===== */}
+      <div className="p-3 grid grid-cols-12 gap-3 items-start">
+        
+        {/* 1. 項次與刪除 (整合成一行) */}
+        <div className="col-span-12 flex justify-between items-center border-b pb-2 mb-1">
+          <div className="font-bold text-blue-700 text-base">
+            項次 {index + 1}
+          </div>
+          <button
+            onClick={() => deleteItem(item.id)}
+            className="text-red-500 hover:text-red-700 px-2 py-1 text-xs border border-red-200 rounded hover:bg-red-50 transition"
+          >
+            🗑 刪除此項
+          </button>
+        </div>
+
+        {/* 2. 品名 (保留原本的 Auto-complete 邏輯) */}
+        <div className="col-span-12 md:col-span-4">
+          <label className="block text-xs text-gray-500 mb-1">品名</label>
+          <input
+            type="text"
+            list={`spec-list-${item.id}`}
+            className="w-full border rounded px-2 py-1.5 focus:ring-2 focus:ring-blue-300 outline-none"
+            placeholder="輸入或選擇品名..."
+            value={item.name || ""}
+            onChange={(e) => handleChange("name", e.target.value)}
+            onBlur={(e) => {
+              // --- 保留原本的自動帶入邏輯 ---
+              const value = e.target.value;
+              const matched = specItems.find(r => (r["品名"] || "") === value);
+              if (!matched) return;
+
+              const materials = [matched["用料1"], matched["用料2"], matched["用料3"]]
+                .filter(v => typeof v === "string" && v.trim() !== "")
+                .join("、");
+
+              updateItem({
+                name: matched["品名"] || "",
+                unit: matched["單位"] || "",
+                price: Number(matched["單價"] || 0),
+                specMain: matched["規格"] || "",  
+                specMaterial: materials            
+              });
+            }}
+          />
+          <datalist id={`spec-list-${item.id}`}>
+            {specItems.map((r, i) => (
+              <option key={i} value={r["品名"] || ""}>
+                {r["規格"] ? `(${r["規格"]})` : ""}
+              </option>
+            ))}
+          </datalist>
+        </div>
+
+        {/* 3. 規格說明 */}
+        <div className="col-span-12 md:col-span-8">
+          <label className="block text-xs text-gray-500 mb-1">規格說明</label>
+          <input
+            type="text"
+            className="w-full border rounded px-2 py-1.5 focus:ring-2 focus:ring-blue-300 outline-none"
+            value={item.specMain || ""}
+            onChange={(e) => handleChange("specMain", e.target.value)}
+          />
+        </div>
+
+        {/* 4. 單位 (窄) */}
+        <div className="col-span-3 md:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">單位</label>
+          <input
+            type="text"
+            className="w-full border rounded px-2 py-1.5 text-center outline-none"
+            value={item.unit || ""}
+            onChange={(e) => handleChange("unit", e.target.value)}
+          />
+        </div>
+
+        {/* 5. 數量 (窄) */}
+        <div className="col-span-3 md:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">數量</label>
+          <input
+            type="number"
+            className="w-full border rounded px-2 py-1.5 text-center outline-none"
+            value={item.qty}
+            onChange={(e) => handleChange("qty", Number(e.target.value))}
+          />
+        </div>
+
+        {/* 6. 單價 (中) */}
+        <div className="col-span-6 md:col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">單價</label>
+          <input
+            type="number"
+            className="w-full border rounded px-2 py-1.5 text-right outline-none"
+            value={item.price}
+            onChange={(e) => handleChange("price", Number(e.target.value))}
+          />
+        </div>
+
+        {/* 7. 小計 (純顯示) */}
+        <div className="col-span-6 md:col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">小計</label>
+          <div className="w-full bg-gray-100 rounded px-2 py-1.5 text-right text-gray-700 font-medium">
+             {/* 這裡直接計算，避免找不到 calcAmount 函數 */}
+             {((item.qty || 0) * (item.price || 0)).toLocaleString()}
+          </div>
+        </div>
+
+        {/* 8. 品牌/產地 (如果有 variants 才顯示) */}
+        {Array.isArray(item.variants) && item.variants.length > 0 && (
+           <div className="col-span-12 md:col-span-6">
+             <label className="block text-xs text-gray-500 mb-1">品牌選項</label>
+             <select
+                className="w-full border rounded px-2 py-1.5"
+                value={item.selected}
+                onChange={(e) => {
+                  const selectedKey = e.target.value;
+                  const variant = item.variants.find(v => v.key === selectedKey);
+                  updateItem({
+                    selected: selectedKey,
+                    price: variant ? variant.defaultPrice : item.price
+                  });
+                }}
+              >
+                {item.variants.map(v => (
+                  <option key={v.key} value={v.key}>{v.label}</option>
+                ))}
+              </select>
+           </div>
+        )}
+
+      </div>
+
+      {/* ===== 第二區：進階輸入 (摺疊區) ===== */}
+      <details className="group border-t border-gray-100 bg-gray-50">
+        <summary className="cursor-pointer list-none p-2 text-center text-xs text-blue-600 hover:bg-blue-50 font-medium select-none flex items-center justify-center gap-2 transition-colors">
+          <span>📝 編輯用料明細 / 備註 / 補充圖片與文字 ({item.subItems?.length || 0})</span>
+          <span className="group-open:rotate-180 transition-transform duration-200">▼</span>
+        </summary>
+        
+        <div className="p-4 grid grid-cols-1 gap-4 animate-fade-in">
+          
+          {/* 用料明細 & 備註 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">用料明細 (列印時顯示)</label>
+              <textarea
+                className="w-full border rounded px-3 py-2 text-sm focus:ring-1 focus:ring-blue-300 outline-none"
+                rows="3"
+                value={item.specMaterial || ""}
+                onChange={(e) => handleChange("specMaterial", e.target.value)}
+                placeholder="輸入詳細用料..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">備註</label>
+              <textarea
+                className="w-full border rounded px-3 py-2 text-sm focus:ring-1 focus:ring-blue-300 outline-none"
+                rows="3"
+                value={item.remarks || ""}
+                onChange={(e) => handleChange("remarks", e.target.value)}
+                placeholder="輸入內部備註..."
+              />
+            </div>
+          </div>
+
+          {/* 子項目列表 (補充文字/圖片) */}
+          {(item.subItems || []).length > 0 && (
+            <div className="space-y-2 mt-2">
+              <div className="text-xs font-bold text-gray-400">補充項目列表：</div>
+              {(item.subItems || []).map((sub, idx) => (
+                <div key={sub.id} className="border p-2 rounded bg-white flex gap-3 items-start shadow-sm">
+                  <div className="text-xs text-gray-400 mt-1">{idx + 1}.</div>
+                  
+                  {/* 圖片類型 */}
+                  {sub.type === "image" && (
+                    <div className="flex-1">
+                      <div className="text-xs text-blue-600 font-bold mb-1">圖片</div>
+                      <img src={sub.imageData} alt="upload" className="h-20 w-auto rounded border object-contain" />
+                    </div>
+                  )}
+
+                  {/* 文字類型 */}
+                  {sub.type === "text" && (
+                    <div className="flex-1 space-y-1">
+                      <div className="text-xs text-blue-600 font-bold">文字說明</div>
+                      <input 
+                        type="text" 
+                        placeholder="標題..."
+                        className="w-full border p-1 text-sm rounded"
+                        value={sub.name}
+                        onChange={e => handleUpdateSub(sub.id, "name", e.target.value)}
+                      />
+                      <textarea 
+                        placeholder="內容..."
+                        className="w-full border p-1 text-sm rounded"
+                        rows="1"
+                        value={sub.remarks}
+                        onChange={e => handleUpdateSub(sub.id, "remarks", e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <button 
+                    className="text-red-400 hover:text-red-600 text-sm px-2"
+                    onClick={() => handleDeleteSub(sub.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 按鈕區 */}
+          <div className="flex gap-3 pt-2">
+            <button
+              className="flex-1 py-2 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 transition shadow-sm text-gray-700"
+              onClick={handleAddSubText}
+            >
+              ＋ 補充文字
+            </button>
+
+            <label className="flex-1 py-2 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 transition shadow-sm text-gray-700 cursor-pointer text-center">
+              ＋ 補充圖片
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handleAddSubImage(e.target.files[0]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/***********************************************************
+  * P4-3 — QuoteEditor / ExportButton / PrintButton / PrintLayout
+ ***********************************************************/
+// 報價單編輯主元件
 function QuoteEditor() {
-    const { activeQuote, updateQuote, specList } = React.useContext(AppContext);
+    const { activeQuote, updateQuote } = React.useContext(AppContext);
+    const componentRef = React.useRef(null);
 
     if (!activeQuote) {
         return (
-            <div className="text-gray-400 text-lg">
-                請先新增或選擇左側的報價單
+            <div className="p-8 text-center text-gray-500 text-xl">
+                請從左側選擇一個報價單或新建一個報價單。
             </div>
         );
     }
+    
+    const handleChange = (field, value) => {
+        updateQuote(activeQuote.id, { [field]: value });
+    };
 
-    const update = (data) => updateQuote(activeQuote.id, data);
+    const handleUpdateItem = (itemId, data) => {
+        const newItems = activeQuote.items.map(item => 
+            item.id === itemId ? { ...item, ...data } : item
+        );
+        updateQuote(activeQuote.id, { items: newItems });
+    };
 
-    /* 新增項目 */
-    const addItem = () => {
+    const handleDeleteItem = (itemId) => {
+        const newItems = activeQuote.items.filter(item => item.id !== itemId);
+        updateQuote(activeQuote.id, { items: newItems });
+    };
+
+    const handleAddItem = () => {
         const newItem = {
             id: uuid(),
-            name: "",
-            unit: "",
+            name: "", 
+            specMain: "",
+            unit: "式",
             qty: 1,
             price: 0,
-            specMain: "",
-            originalSpec: "",
-            specMaterial: "",
+            subItems: [],
             remarks: "",
-            pictures: []
+            specMaterial: ""
         };
-
-        update({
-            items: [...activeQuote.items, newItem]
-        });
+        updateQuote(activeQuote.id, { items: [...activeQuote.items, newItem] });
     };
+    
+    const totalAmount = calcTotal(activeQuote.items);
+    
+    const negotiatedAmount = calcNegotiated(
+        totalAmount,
+        activeQuote.discountPercent,
+        activeQuote.negotiatedPrice
+    );
 
-    /* 修改單一項目 */
-    const updateItem = (id, data) => {
-        const newList = activeQuote.items.map(it =>
-            it.id === id ? { ...it, ...data } : it
-        );
-        update({ items: newList });
-    };
+    // 判斷是否顯示最終報價（只要有折扣 OR 有自定義價格，就顯示）
+    const showFinalPrice = (activeQuote.discountPercent > 0) || (activeQuote.negotiatedPrice > 0);
 
-    /* 刪除項目 */
-    const deleteItem = (id) => {
-        const list = activeQuote.items.filter(it => it.id !== id);
-        update({ items: list });
-    };
+   return (
+  <div className="quote-editor-root-container text-lg">
+    {/* 編輯區 (有 .no-print) */}
+    <div className="p-8 bg-gray-100 rounded-xl shadow-xl no-print">
 
-    const total = calcTotal(activeQuote.items);
+      {/* ===== 標題 ===== */}
+      <h1 className="text-3xl font-bold mb-6 border-b pb-3">
+        編輯報價單：{activeQuote.title || "未命名"}
+      </h1>
 
-    return (
-        <div className="space-y-4">
+     {/* ===== 報價單基本資料（表頭卡 - 緊湊版） ===== */}
+      <div className="bg-white p-4 rounded-lg mb-6 border border-gray-300 shadow-sm text-sm">
+        
+        {/* 使用 grid-cols-4 讓空間利用更有效率，gap 縮小為 3 */}
+        <div className="grid grid-cols-4 gap-3">
 
-            {/* =============== 基本資料 =============== */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="text-sm">工程名稱</label>
-                    <input
-                        className="w-full border p-2 rounded"
-                        value={activeQuote.title}
-                        onChange={e => update({ title: e.target.value })}
-                    />
-                </div>
+          {/* 第一列：單號 (佔1) + 日期 (佔1) + 標題 (佔2) */}
+          <div className="col-span-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1">報價單編號</label>
+            <div className="font-mono font-bold text-blue-700 text-base leading-tight mt-1">
+              {activeQuote.quoteNo}
+            </div>
+          </div>
 
-                <div>
-                    <label className="text-sm">客戶名稱</label>
-                    <input
-                        className="w-full border p-2 rounded"
-                        value={activeQuote.customer}
-                        onChange={e => update({ customer: e.target.value })}
-                    />
-                </div>
+          <div className="col-span-1">
+             <label className="block text-xs font-bold text-gray-500 mb-1">報價日期</label>
+             <input
+              type="date"
+              value={activeQuote.date}
+              onChange={(e) => handleChange("date", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-                <div>
-                    <label className="text-sm">聯絡人</label>
-                    <input
-                        className="w-full border p-2 rounded"
-                        value={activeQuote.contact}
-                        onChange={e => update({ contact: e.target.value })}
-                    />
-                </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-gray-500 mb-1">工程名稱 / 標題</label>
+            <input
+              type="text"
+              value={activeQuote.title}
+              onChange={(e) => handleChange("title", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+              placeholder="請輸入工程名稱"
+            />
+          </div>
 
-                <div>
-                    <label className="text-sm">聯絡電話</label>
-                    <input
-                        className="w-full border p-2 rounded"
-                        value={activeQuote.phone}
-                        onChange={e => update({ phone: e.target.value })}
-                    />
-                </div>
+          {/* 第二列：客戶 (佔1) + 聯絡人 (佔1) + 電話 (佔1) + 地點 (佔1) */}
+          <div className="col-span-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1">客戶名稱</label>
+            <input
+              type="text"
+              value={activeQuote.customerName}
+              onChange={(e) => handleChange("customerName", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-                <div>
-                    <label className="text-sm">安裝地點</label>
-                    <input
-                        className="w-full border p-2 rounded"
-                        value={activeQuote.location}
-                        onChange={e => update({ location: e.target.value })}
-                    />
-                </div>
+          <div className="col-span-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1">聯絡人</label>
+            <input
+              type="text"
+              value={activeQuote.contact}
+              onChange={(e) => handleChange("contact", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1">聯絡電話</label>
+            <input
+              type="text"
+              value={activeQuote.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-xs font-bold text-gray-500 mb-1">工程地點</label>
+            <input
+              type="text"
+              value={activeQuote.location}
+              onChange={(e) => handleChange("location", e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+        </div>
+
+        {/* ===== 金額摘要區 (橫向排列，節省垂直空間) ===== */}
+        <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+            {/* 左邊：總金額 */}
+            <div className="flex items-center gap-2">
+                <span className="text-gray-600 font-bold">總計金額(未稅)：</span>
+                <span className="text-xl font-bold text-blue-700">
+                    NT$ {formatMoney(totalAmount)}
+                </span>
             </div>
 
-            {/* =============== 控制按鈕 =============== */}
-            <div className="flex gap-3 my-2">
-                <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded"
-                    onClick={() => printQuote(activeQuote)}
-                >
-                    列印 / PDF
-                </button>
-
-                <button
-                    className="bg-green-600 text-white px-4 py-2 rounded"
-                    onClick={() => exportExcel(activeQuote)}
-                >
-                    匯出 Excel
-                </button>
-
-                <button
-                    className="bg-gray-700 text-white px-4 py-2 rounded"
-                    onClick={addItem}
-                >
-                    + 新增項目
-                </button>
-            </div>
-
-            {/* =============== 項目編輯器 =============== */}
-            <div>
-                {activeQuote.items.map((it, idx) => (
-                    <QuoteItem
-                        key={it.id}
-                        item={it}
-                        index={idx}
-                        specList={specList}
-                        updateItem={(data) => updateItem(it.id, data)}
-                        deleteItem={deleteItem}
+            {/* 右邊：折扣與最終報價 (並排顯示) */}
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500">折扣(%)</span>
+                    <input
+                        type="number"
+                        value={activeQuote.discountPercent}
+                        onChange={(e) => handleChange("discountPercent", Number(e.target.value))}
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 outline-none"
                     />
-                ))}
-            </div>
-
-            {/* =============== 合計 =============== */}
-            <div className="text-right text-lg font-bold">
-                合計：{formatMoney(total)}
-            </div>
-
-            {/* =============== 備註 & 付款條件 =============== */}
-            <div className="grid grid-cols-2 gap-6 mt-4">
-                <div>
-                    <label className="text-sm font-semibold">備註</label>
-                    <textarea
-                        className="w-full border p-2 rounded h-32"
-                        value={activeQuote.notes}
-                        onChange={e => update({ notes: e.target.value })}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500">自定義最終價</span>
+                    <input
+                        type="number"
+                        value={activeQuote.negotiatedPrice}
+                        onChange={(e) => handleChange("negotiatedPrice", Number(e.target.value))}
+                        className="w-24 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 outline-none"
                     />
                 </div>
 
-                <div>
-                    <label className="text-sm font-semibold">付款條件</label>
-                    <textarea
-                        className="w-full border p-2 rounded h-32"
-                        value={activeQuote.payment}
-                        onChange={e => update({ payment: e.target.value })}
-                    />
-                </div>
+                {/* 如果有最終報價，顯示紅色金額 */}
+                {showFinalPrice && (
+                    <div className="pl-4 border-l border-gray-300">
+                        <span className="text-red-600 font-bold text-lg">
+                           ${formatMoney(negotiatedAmount)}
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
-    );
+      </div>
+
+      {/* ===== 報價項目列表 ===== */}
+      <h2 className="text-2xl font-bold mt-10 mb-4 border-b pb-2">
+        報價項目列表
+      </h2>
+
+      <button
+        className="bg-green-600 text-white px-5 py-2 rounded-lg mb-6 hover:bg-green-700 text-base"
+        onClick={handleAddItem}
+      >
+        ＋ 新增工程大項
+      </button>
+
+      <div className="quote-items-container space-y-6">
+        {activeQuote.items.map((item, index) => (
+          <QuoteItem
+            key={item.id}
+            item={item}
+            index={index}
+            updateItem={(data) => handleUpdateItem(item.id, data)}
+            deleteItem={handleDeleteItem}
+          />
+        ))}
+      </div>
+
+      {/* ▼▼▼ 插入這裡：如果有零件資料，就顯示編輯器 ▼▼▼ */}
+            {activeQuote.leakageParts && (
+              <LeakagePartsEditor 
+                parts={activeQuote.leakageParts} 
+                updateQuote={(data) => updateQuote(activeQuote.id, data)} 
+              />
+            )}
+      {/* ===== 備註 / 付款條件 ===== */}
+      <div className="mt-10 grid grid-cols-2 gap-8">
+        <div>
+          <h3 className="font-bold text-lg mb-2">備註（不含稅）</h3>
+          <textarea
+            value={activeQuote.notes}
+            onChange={(e) => handleChange("notes", e.target.value)}
+            rows="8"
+            className="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+
+        <div>
+          <h3 className="font-bold text-lg mb-2">付款條件</h3>
+          <textarea
+            value={activeQuote.payment}
+            onChange={(e) => handleChange("payment", e.target.value)}
+            rows="8"
+            className="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+      </div>
+
+        {/* ===== 匯出 / 列印 ===== */}
+      <div className="mt-10 pt-6 border-t flex gap-4 justify-end no-print">
+        <ExportButton />
+        <ExportWordButton componentRef={componentRef} />
+        <PrintButton componentRef={componentRef} />
+      </div>
+
+      {/* ===== 即時預覽（畫面用） ===== */}
+      <div className="live-preview-box mt-12 no-print">
+        <h3 className="text-center font-bold text-2xl text-blue-700 mb-6">
+          實時預覽區（非列印尺寸）
+        </h3>
+
+        {/* ▼▼▼ 修改開始：這裡增加了灰色背景與白紙樣式 ▼▼▼ */}
+        <div 
+          style={{ 
+            backgroundColor: "#525659", // 深灰色背景，模仿 PDF 預覽軟體
+            padding: "40px 0",          // 上下留出空間
+            overflowX: "auto",          // 螢幕太小時可左右滑動
+            border: "1px solid #ccc"
+          }}
+        >
+          <div 
+            className="print-page"
+            style={{
+              backgroundColor: "white",        // 白紙底色
+              width: "210mm",                  // A4 寬度
+              minHeight: "297mm",              // A4 高度
+              margin: "0 auto",                // 左右置中
+              padding: "20mm",                 // 模擬列印邊界 (如果 PrintLayout 內已有邊距，這裡可改 0)
+              boxShadow: "0 0 20px rgba(0,0,0,0.5)", // 增加陰影，讓紙張浮起來
+              boxSizing: "border-box"
+            }}
+          >
+            <PrintLayout
+              quote={activeQuote}
+              totalAmount={totalAmount}
+              negotiatedAmount={negotiatedAmount}
+              isPreview={true}
+            />
+          </div>
+        </div>
+        {/* ▲▲▲ 修改結束 ▲▲▲ */}
+
+      </div>
+    </div> 
+    {/* ⬆️ 這裡結束 .no-print 容器 */}
+
+    {/* ⚠️ 重要修正：
+       將列印專用的 div 移到 .no-print 容器的外面。
+       這樣當 .no-print 被隱藏時，這個 div 才能被顯示出來。
+    */}
+    <div
+      ref={componentRef}
+      className="print-only-layout"
+    >
+      <PrintLayout
+        quote={activeQuote}
+        totalAmount={totalAmount}
+        negotiatedAmount={negotiatedAmount}
+        isPreview={false}
+      />
+    </div>
+
+  </div>
+  );
 }
 
+// ===============================
+// Excel 匯出
+// ===============================
+function ExportButton() {
+  const { activeQuote } = React.useContext(AppContext);
+
+  const handleExport = () => {
+    if (!activeQuote || !activeQuote.items?.length) {
+      alert("請先新增報價項目");
+      return;
+    }
+
+    const companyKey = activeQuote.company || "herhsin";
+    const company = COMPANY_DATA[companyKey];
+    const total = calcTotal(activeQuote.items);
+    const negotiated = calcNegotiated(total, activeQuote.discountPercent, activeQuote.negotiatedPrice);
+    
+    // 判斷是否顯示最終報價
+    const showFinalPrice = (activeQuote.discountPercent > 0) || (activeQuote.negotiatedPrice > 0);
+
+    const rows = [];
+    let r = 0;
+
+    rows[r++] = [company.name];
+    rows[r++] = ["工程報價單"];
+    rows[r++] = [];
+
+    rows[r++] = ["報價單號", activeQuote.quoteNo, "", "", "報價日期", activeQuote.date];
+    rows[r++] = ["工程名稱", activeQuote.title];
+    rows[r++] = ["客戶名稱", activeQuote.customerName, "", "聯絡人", activeQuote.contact];
+    rows[r++] = ["工程地點", activeQuote.location];
+    rows[r++] = [];
+
+    rows[r++] = ["項次","品名","規格 / 補充內容","單位","數量","單價","金額(小計)","備註","用料明細"];
+
+    let index = 1;
+    activeQuote.items.forEach(item => {
+      rows[r++] = [
+        index++,
+        item.name || "",
+        item.specMain || "",
+        item.unit || "",
+        item.qty || "",
+        item.price || "",
+        calcAmount(item),
+        item.remarks || "",
+        item.specMaterial || ""
+      ];
+
+      if (item.specMaterial) {
+         rows[r++] = ["", `用料明細：${item.specMaterial}`, "", "", "", "", "", "", ""];
+      }
+
+      (item.subItems || []).forEach(sub => {
+        if (sub.type === "text") {
+          rows[r++] = ["", `補充：${sub.name || ""}`, sub.remarks || "", "", "", "", "", "", ""];
+        }
+        if (sub.type === "image") {
+          rows[r++] = ["", "補充圖片", "（圖片請參考列印版）", "", "", "", "", "", ""];
+        }
+      });
+    });
+
+    rows[r++] = [];
+    rows[r++] = ["", "", "", "", "", "總計", total];
+    
+    // ⭐ 如果沒有折扣/自定義價格，就不輸出這兩行
+    if (showFinalPrice) {
+        rows[r++] = ["", "", "", "", "", "折扣(%)", activeQuote.discountPercent || 0];
+        rows[r++] = ["", "", "", "", "", "最終報價", negotiated];
+    }
+    
+    rows[r++] = [];
+    rows[r++] = ["備註"];
+    rows[r++] = [activeQuote.notes || ""];
+    rows[r++] = [];
+    rows[r++] = ["付款條件"];
+    rows[r++] = [activeQuote.payment || ""];
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+      { s: { r: 4, c: 1 }, e: { r: 4, c: 8 } },
+      { s: { r: 5, c: 1 }, e: { r: 5, c: 8 } },
+    ];
+    
+    ws["!cols"] = [{ wch: 12 }, { wch: 26 }, { wch: 42 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 32 }];
+
+    Object.keys(ws).forEach(key => {
+      if (ws[key]?.v && typeof ws[key].v === "number") ws[key].z = "#,##0";
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "報價單");
+
+    const filename = `${activeQuote.quoteNo}_${activeQuote.customerName || "未填客戶"}-${activeQuote.title || "未命名工程"} 報價單.xlsx`.replace(/[\\/:*?"<>|]/g,"");
+    XLSX.writeFile(wb, filename);
+  };
+
+  return (
+    <button
+      onClick={handleExport}
+      className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+    >
+      匯出 Excel（報價單版型）
+    </button>
+  );
+}
+
+// ===============================
+// Word 匯出
+// ===============================
+function ExportWordButton({ componentRef }) {
+  const { activeQuote } = React.useContext(AppContext);
+
+  const handleExportWord = () => {
+    if (!componentRef?.current || !activeQuote) {
+      alert("找不到報價單內容，請確認預覽已載入");
+      return;
+    }
+
+    const htmlContent = componentRef.current.innerHTML;
+
+    const wordHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>工程報價單</title>
+  <style>
+    @page { size: A4; margin: 15mm; margin-top: 80mm; }
+    body { margin: 0; padding: 0; }
+    .word-page { width: 794px; margin: 0 auto; padding: 20px; box-sizing: border-box; font-family: "Microsoft JhengHei", sans-serif; font-size: 15px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #000; padding: 6px; font-size: 15px; vertical-align: top; }
+    img { display: block; margin: 10px auto; max-width: 80%; height: auto; }
+  </style>
+</head>
+<body>
+  <div class="word-page">${htmlContent}</div>
+</body>
+</html>`;
+
+    const filename = `${activeQuote.quoteNo}_${activeQuote.customerName || "未填客戶"}-${activeQuote.title || "未命名工程"} 報價單.doc`.replace(/[\\/:*?"<>|]/g, "");
+    const blob = new Blob(["\ufeff", wordHTML], { type: "application/msword;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <button onClick={handleExportWord} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+      匯出 Word（報價單版型）
+    </button>
+  );
+}
+function PrintButton() {
+  return (
+    <button
+      onClick={() => window.print()}
+      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+    >
+      列印報價單
+    </button>
+  );
+}
 
 /***********************************************************
- * 主 App
+ * 列印排版組件（PrintLayout）— 極致置頂與壓縮版
+ ***********************************************************/
+function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
+  // 1. 防呆檢查
+  if (!quote || !COMPANY_DATA[quote.company]) {
+    return (
+      <div style={{ textAlign: "center", padding: 20, color: "#888" }}>
+        請選擇或新增報價單以顯示預覽
+      </div>
+    );
+  }
+
+  // 2. 變數定義
+  const companyInfo = COMPANY_DATA[quote.company];
+  const isLeakageMode = quote.items.some(i => i.name?.includes("漏漿")) || quote.title?.includes("漏漿");
+  const itemsToPrint = isLeakageMode ? quote.items.filter(item => item.qty > 0) : quote.items;
+  const showFinalPrice = (quote.discountPercent > 0) || (quote.negotiatedPrice > 0);
+  const calcAmount = (item) => item.price * item.qty;
+
+  // 3. 樣式定義 (極致壓縮)
+  const TH_TD = { border: "1px solid #000", padding: "3px 4px", fontSize: "12px", verticalAlign: "middle", lineHeight: "1.2" };
+  const TH = { ...TH_TD, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", padding: "4px" };
+  const TD_RIGHT = { ...TH_TD, textAlign: "right" };
+  const TD_CENTER = { ...TH_TD, textAlign: "center" };
+
+  return (
+    <div className="print-page">
+      {/* ★★★ 新增：強制設定列印邊界為 5mm，讓內容盡量往上靠 ★★★ */}
+      <style>{`
+        @media print {
+          @page { margin: 5mm 10mm 5mm 10mm; size: auto; }
+          body { margin: 0; }
+        }
+      `}</style>
+
+      <div className="print-content">
+        
+        {/* ==========================================
+            Part 1: 表頭資料區 (置頂修正版)
+            ========================================== */}
+        {/* marginTop: -15px 強制將表格往上拉，抵消容器可能的 padding */}
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 5, marginTop: "-15px" }}>
+          <tbody>
+            <tr>
+              <td colSpan="2" style={{ textAlign: "center", paddingBottom: 5 }}>
+                <h2 style={{ margin: 0, fontSize: "22px", lineHeight: "1.2" }}>{companyInfo.name}</h2>
+                <div style={{ fontSize: 11, marginTop: 2 }}>
+                  統編：{companyInfo.taxId} ｜ 電話：{companyInfo.tel} ｜ 傳真：{companyInfo.fax}
+                </div>
+                <div style={{ fontSize: 11 }}>{companyInfo.address}</div>
+                {/* 縮小這裡的 marginTop */}
+                <h3 style={{ marginTop: 5, fontSize: "18px", borderBottom: "2px solid #333", display: "inline-block", paddingBottom: 2 }}>工程報價單</h3>
+              </td>
+            </tr>
+            <tr>
+              {/* 左欄 */}
+              <td style={{ verticalAlign: "bottom", width: "60%", fontSize: 12, lineHeight: "1.4em" }}>
+                 <div><strong>客戶名稱：</strong>{quote.customerName}</div>
+                 <div><strong>工程名稱：</strong>{quote.title}</div>
+                 <div><strong>工程地點：</strong>{quote.location}</div>
+                 <div><strong>聯絡電話：</strong>{quote.phone}</div>
+              </td>
+              {/* 右欄 */}
+              <td style={{ verticalAlign: "bottom", width: "40%", textAlign: "right", fontSize: 12, lineHeight: "1.4em" }}>
+                 <div><strong>報價單號：</strong>{quote.quoteNo}</div>
+                 <div><strong>報價日期：</strong>{quote.date}</div>
+                 <div><strong>聯絡人：</strong>{quote.contact}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table> 
+
+
+        {/* ==========================================
+            Part 2: 主項目列表
+            ========================================== */}
+        <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid black" }}>
+          <colgroup>
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "8%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={TH}>項<br />次</th>
+              <th style={TH}>品名</th>
+              <th style={TH}>規格</th>
+              <th style={TH}>單位</th>
+              <th style={TH}>數量</th>
+              <th style={TH}>單價</th>
+              <th style={TH}>小計</th>
+              <th style={TH}>備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itemsToPrint.map((item, index) => (
+              <React.Fragment key={item.id || index}>
+                <tr>
+                    <td style={TD_CENTER}>{index + 1}</td>
+                    <td style={TH_TD}>{item.name}</td>
+                    <td style={{ ...TH_TD, color: "#444" }}>{item.specMain}</td>
+                    <td style={TD_CENTER}>{item.unit}</td>
+                    <td style={TD_CENTER}>{item.qty}</td>
+                    <td style={TD_RIGHT}>
+                        {item.price > 0 ? formatMoney(item.price) : "-"}
+                    </td>
+                    <td style={{ ...TD_RIGHT, fontWeight: "bold" }}>
+                        {calcAmount(item) > 0 ? formatMoney(calcAmount(item)) : "-"}
+                    </td>
+                    <td style={TH_TD}>{item.remarks}</td>
+                </tr>
+                {/* 用料明細 */}
+                {item.specMaterial && (
+                  <tr>
+                    <td style={{ ...TH_TD, borderTop: "none" }}></td>
+                    <td colSpan="7" style={{ ...TH_TD, color: "#444", fontSize: "11px", borderTop: "1px dashed #ccc" }}>
+                      <span style={{ fontWeight: "bold" }}>用料：</span>{item.specMaterial}
+                    </td>
+                  </tr>
+                )}
+                {/* 子項目 */}
+                {item.subItems && item.subItems.map(sub => (
+                    <tr key={sub.id}>
+                         <td style={{ ...TH_TD, borderTop: "none" }}></td>
+                         <td colSpan="7" style={{ ...TH_TD, color: "#666", fontSize: "11px", textAlign: sub.type === "image" ? "center" : "left" }}>
+                           {sub.type === "image" ? (
+                             <img src={sub.imageData} alt="圖片" style={{ maxWidth: "50%", maxHeight: "150px", display: "block", margin: "0 auto" }} />
+                           ) : (
+                             <span><span style={{fontWeight: "bold"}}>{sub.name}</span>：{sub.remarks}</span>
+                           )}
+                         </td>
+                    </tr>
+                ))}
+              </React.Fragment>
+            ))}
+
+            {itemsToPrint.length === 0 && (
+                <tr><td colSpan={8} style={{...TD_CENTER, padding: 10, color: "#999"}}>無項目</td></tr>
+            )}
+          </tbody>
+        </table>
+
+
+        {/* ==========================================
+            Part 3: 金額總結
+            ========================================== */}
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 5 }}>
+          <tbody>
+            <tr>
+              <td colSpan={6} style={{ ...TD_RIGHT, fontWeight: "bold", border: "none" }}>
+                總計金額（未稅）
+              </td>
+              <td style={{ ...TD_RIGHT, fontWeight: "bold", width: "10%" }}>
+                {formatMoney(totalAmount)}
+              </td>
+              <td style={{ ...TH_TD, width: "8%", border: "none" }}></td>
+            </tr>
+            {showFinalPrice && (
+                <tr>
+                  <td colSpan={6} style={{ ...TD_RIGHT, fontWeight: "bold", border: "none" }}>
+                    最終報價金額（未稅）
+                  </td>
+                  <td style={{ ...TD_RIGHT, fontWeight: "bold", color: "red" }}>
+                    {formatMoney(negotiatedAmount)}
+                  </td>
+                  <td style={{ ...TH_TD, border: "none" }}></td>
+                </tr>
+            )}
+          </tbody>
+        </table>
+
+
+        {/* ==========================================
+            Part 4: 實支實付零件表
+            ========================================== */}
+        {quote.leakageParts && quote.leakageParts.length > 0 && (
+        <div className="mt-2 mb-2 page-break-inside-avoid">
+            <div className="font-bold text-gray-800 mb-1 pl-2 border-l-2 border-blue-600 text-xs">
+            ※ 實支實付維修零件價目表
+            <span className="text-[10px] font-normal text-gray-500 ml-2">
+                (不計入總額，依實作數量計價)
+            </span>
+            </div>
+            
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", border: "1px solid #ccc" }}>
+            <thead>
+                <tr style={{ backgroundColor: "#f4f4f4", borderBottom: "1px solid #ccc" }}>
+                    <th style={{ padding: "2px 4px", textAlign: "left", width: "35%" }}>品名</th>
+                    <th style={{ padding: "2px 4px", textAlign: "left", width: "35%" }}>規格</th>
+                    <th style={{ padding: "2px 4px", textAlign: "center", width: "10%" }}>單位</th>
+                    <th style={{ padding: "2px 4px", textAlign: "right", width: "20%" }}>單價</th>
+                </tr>
+            </thead>
+            <tbody>
+                {quote.leakageParts.map((part, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid #eee" }}>
+                        <td style={{ padding: "1px 4px" }}>{part.name}</td>
+                        <td style={{ padding: "1px 4px", color: "#555" }}>{part.spec}</td>
+                        <td style={{ padding: "1px 4px", textAlign: "center" }}>{part.unit}</td>
+                        <td style={{ padding: "1px 4px", textAlign: "right", fontWeight: "bold" }}>
+                            ${Number(part.price).toLocaleString()}
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+            </table>
+        </div>
+        )}
+
+
+        {/* ==========================================
+            Part 5: 頁尾 & 簽名
+            ========================================== */}
+        <div className="print-footer-block">
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 5 }}>
+                <tbody>
+                <tr>
+                    <td style={{ ...TH_TD, width: "50%", verticalAlign: "top", fontSize: "11px" }}>
+                        <strong>備註：</strong>
+                        <div style={{ whiteSpace: "pre-wrap", marginTop: 2 }}>{quote.notes}</div>
+                    </td>
+                    <td style={{ ...TH_TD, width: "50%", verticalAlign: "top", fontSize: "11px" }}>
+                        <strong>付款條件：</strong>
+                        <div style={{ whiteSpace: "pre-wrap", marginTop: 2 }}>{quote.payment}</div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            
+            <table className="print-signature-area" style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }}>
+                <tbody>
+                <tr>
+                    <td style={{ ...TH_TD, width: "50%", height: 80, verticalAlign: "top", padding: "5px" }}>
+                        <strong>公司報價章</strong>
+                        {companyInfo.stamp && (
+                            <img src={companyInfo.stamp} alt="公司印章" style={{ display: "block", margin: "2px auto", maxHeight: 60 }} />
+                        )}
+                    </td>
+                    <td style={{ ...TH_TD, width: "50%", height: 80, verticalAlign: "top", padding: "5px" }}>
+                        <strong>客戶回簽</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td style={{...TH_TD, borderTop: "none", fontSize: "11px"}}>日期：</td>
+                    <td style={{...TH_TD, borderTop: "none", fontSize: "11px"}}>日期：</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+/* ========================================================
+   ★ 新增組件：實支實付零件編輯器 (LeakagePartsEditor)
+   功能：提供介面讓使用者可以新增、修改、刪除零件
+   ======================================================== */
+function LeakagePartsEditor({ parts, updateQuote }) {
+  // 修改單行內容
+  const handleChange = (id, field, value) => {
+    const newParts = parts.map(p => p.id === id ? { ...p, [field]: value } : p);
+    updateQuote({ leakageParts: newParts });
+  };
+
+  // 刪除單行
+  const handleDelete = (id) => {
+    if(!window.confirm("確定刪除此零件嗎？")) return;
+    const newParts = parts.filter(p => p.id !== id);
+    updateQuote({ leakageParts: newParts });
+  };
+
+  // 新增一行空零件
+  const handleAdd = () => {
+    const newPart = { id: uuid(), name: "", spec: "", unit: "式", price: 0 };
+    updateQuote({ leakageParts: [...(parts || []), newPart] });
+  };
+
+  return (
+    <div className="mt-8 mb-6 border-t pt-6">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold text-gray-700 border-l-4 border-blue-500 pl-2">
+          ※ 實支實付維修零件清單
+          <span className="text-sm font-normal text-gray-500 ml-2">(此區不計入總報價)</span>
+        </h3>
+        <button 
+          onClick={handleAdd} 
+          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 shadow flex items-center gap-1"
+        >
+          <span>＋</span> 新增零件
+        </button>
+      </div>
+
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div className="grid grid-cols-12 gap-2 text-sm text-gray-500 mb-2 px-2">
+           <div className="col-span-4">品名</div>
+           <div className="col-span-4">規格說明</div>
+           <div className="col-span-1 text-center">單位</div>
+           <div className="col-span-2 text-right">單價</div>
+           <div className="col-span-1"></div>
+        </div>
+
+        {(parts || []).map((part, index) => (
+          <div key={part.id} className="grid grid-cols-12 gap-2 mb-2 items-center">
+             {/* 品名 */}
+             <div className="col-span-4">
+                <input 
+                  className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-200 outline-none" 
+                  placeholder="輸入零件名稱..."
+                  value={part.name} 
+                  onChange={(e) => handleChange(part.id, "name", e.target.value)}
+                />
+             </div>
+             {/* 規格 */}
+             <div className="col-span-4">
+                <input 
+                  className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-200 outline-none" 
+                  placeholder="輸入規格..."
+                  value={part.spec} 
+                  onChange={(e) => handleChange(part.id, "spec", e.target.value)}
+                />
+             </div>
+             {/* 單位 */}
+             <div className="col-span-1">
+                <input 
+                  className="w-full border p-2 rounded text-sm text-center focus:ring-2 focus:ring-blue-200 outline-none" 
+                  value={part.unit} 
+                  onChange={(e) => handleChange(part.id, "unit", e.target.value)}
+                />
+             </div>
+             {/* 單價 */}
+             <div className="col-span-2">
+                <input 
+                  type="number"
+                  className="w-full border p-2 rounded text-sm text-right focus:ring-2 focus:ring-blue-200 outline-none font-bold text-gray-700" 
+                  value={part.price} 
+                  onFocus={(e) => e.target.select()} // 點擊時自動全選數字
+                  onChange={(e) => handleChange(part.id, "price", Number(e.target.value))}
+                />
+             </div>
+             {/* 刪除按鈕 */}
+             <div className="col-span-1 text-center">
+                <button 
+                  onClick={() => handleDelete(part.id)} 
+                  className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
+                  title="刪除此項目"
+                >
+                  ✕
+                </button>
+             </div>
+          </div>
+        ))}
+
+        {(parts || []).length === 0 && (
+            <div className="text-gray-400 text-center py-6 border-2 border-dashed border-gray-200 rounded">
+                目前沒有零件項目，請點擊上方按鈕新增。
+            </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/***********************************************************
+  // P5 — App 根元件 (完整修復版)
  ***********************************************************/
 function App() {
-    return (
-        <AppProvider>
-            <div className="flex h-screen">
-                {/* 左側 Panel */}
-                <div className="w-72 border-r p-4 bg-gray-50 overflow-y-auto">
-                    <CompanySelector />
-                    <QuoteList />
-                </div>
+  // 1. 從 Context 取得資料
+  const { 
+    quotes, setQuotes, 
+    activeQuoteId, setActiveQuoteId,
+    company 
+  } = React.useContext(AppContext);
 
-                {/* 右側 編輯器 */}
-                <div className="flex-1 p-6 overflow-y-auto">
-                    <QuoteEditor />
-                </div>
-            </div>
-        </AppProvider>
-    );
+  /* ========================================================
+     (1) 新建報價單
+     ======================================================== */
+  const createQuote = React.useCallback((modeId = null) => {
+    const mode = MODE_CONFIG.find(m => m.id === modeId) || MODE_CONFIG[0];
+    const newQuote = {
+      id: uuid(),
+      company: company, 
+      quoteNo: generateQuoteNo(company),
+      title: mode.defaultTitle,
+      customerName: "",
+      date: formatDate(),
+      items: mode.defaultItems.map(item => ({ ...item, id: uuid() })), 
+      leakageParts: [], 
+      notes: mode.defaultNotes,
+      payment: mode.defaultPayment,
+      discountPercent: 0,
+      negotiatedPrice: 0
+    };
+    setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+  }, [company, setQuotes, setActiveQuoteId]);
+
+  /* ========================================================
+     (2) 刪除報價單
+     ======================================================== */
+  const deleteQuote = React.useCallback((id) => {
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    if (activeQuoteId === id) setActiveQuoteId(null);
+  }, [activeQuoteId, setQuotes, setActiveQuoteId]);
+
+  /* ========================================================
+     (3) 更新報價單
+     ======================================================== */
+  const updateQuote = React.useCallback((id, data) => {
+    setQuotes(prev => prev.map(q => q.id === id ? { ...q, ...data } : q));
+  }, [setQuotes]);
+
+  /* ========================================================
+     (4) 複製報價單 (您的新功能)
+     ======================================================== */
+  const duplicateQuote = React.useCallback((id) => {
+    const sourceQuote = quotes.find(q => q.id === id);
+    if (!sourceQuote) return;
+
+    const newQuote = {
+      ...JSON.parse(JSON.stringify(sourceQuote)), 
+      id: uuid(),                                
+      quoteNo: generateQuoteNo(sourceQuote.company), 
+      title: `${sourceQuote.title} (副本)`,       
+      date: formatDate(),                        
+      items: sourceQuote.items.map(item => ({ ...item, id: uuid() })),
+      leakageParts: (sourceQuote.leakageParts || []).map(part => ({ ...part, id: uuid() }))
+    };
+
+    setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+  }, [quotes, setQuotes, setActiveQuoteId]);
+
+  /* ========================================================
+     (5) 套用模式 (Apply Mode)
+     ======================================================== */
+  const applyMode = React.useCallback((modeId) => {
+    if (!activeQuoteId) return;
+    const mode = MODE_CONFIG.find(m => m.id === modeId);
+    if (!mode) return;
+
+    if (!window.confirm("確定要覆蓋當前報價單內容嗎？此動作無法復原。")) return;
+
+    const newItems = mode.defaultItems.map(item => ({ ...item, id: uuid() }));
+    // 這裡我們只給空陣列，因為套用模板時通常不需要預設零件，或者您也可以定義預設零件
+    const newLeakageParts = []; 
+
+    updateQuote(activeQuoteId, {
+      items: newItems,
+      leakageParts: newLeakageParts,
+      notes: mode.defaultNotes,
+      payment: mode.defaultPayment
+    });
+  }, [activeQuoteId, updateQuote]);
+
+
+  // ▼▼▼▼▼ 這裡是 Return UI 介面 ▼▼▼▼▼
+  return (
+    <div className="min-h-screen bg-gray-50 flex print:block print:bg-white">
+        
+        {/* 側邊欄：加入 no-print 隱藏 */}
+        <div className="w-96 bg-white p-6 shadow-lg flex-shrink-0 text-lg sticky top-0 h-screen overflow-y-auto no-print">
+            <h1 className="text-2xl font-extrabold mb-6 text-center text-blue-700">工程報價系統</h1>
+            <CompanySelector />
+            <ModeSelector applyMode={applyMode} />
+            
+            {/* ✅ 這裡修正了：只留下一個正確的 QuoteList */}
+            <QuoteList 
+                quotes={quotes} 
+                activeId={activeQuoteId} 
+                selectQuote={setActiveQuoteId} 
+                deleteQuote={deleteQuote} 
+                duplicateQuote={duplicateQuote} 
+            />
+        </div>
+        
+        {/* 主編輯區：列印時移除 padding */}
+        <div className="flex-grow p-8 text-base print:p-0">
+            {/* 這裡要傳遞 updateQuote 給編輯器，否則編輯器會壞掉 */}
+            <QuoteEditor updateQuote={updateQuote} />
+        </div>
+    </div>
+  );
 }
 
 /***********************************************************
- * ReactDOM Render
+ * P6 — React 18 啟動
  ***********************************************************/
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-
-</script> <!-- ⭐ 這是 JS 的結尾，緊接在 render 後面 -->
-
-<!-- 🔹 列印專用隱藏區塊（⚠ 不可以放在 script 裡） -->
-<div id="printArea" style="display:none;"></div>
-
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <AppProvider>
+    <App />
+  </AppProvider>
+);
+</script>
 </body>
 </html>
-
