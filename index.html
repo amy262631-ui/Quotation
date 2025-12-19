@@ -2144,107 +2144,40 @@ function LeakagePartsEditor({ parts, updateQuote }) {
 }
 
 /***********************************************************
-  // P5 — App 根元件 (完整修復版)
+ * P5 — App 根元件 (正確引用版：不重複定義邏輯)
  ***********************************************************/
 function App() {
+  // ⭐ 直接從 Context 拿取 AppProvider 定義好的所有功能
   const { 
-    quotes, setQuotes, 
-    activeQuoteId, setActiveQuoteId,
-    company 
+    quotes, 
+    activeQuoteId, setActiveQuoteId, 
+    deleteQuote, 
+    duplicateQuote, 
+    applyMode,
+    loadFromCloud // 如果有雲端同步按鈕需要這個
   } = React.useContext(AppContext);
 
-  // (1) 新建報價單
-  const createQuote = React.useCallback((modeId = null) => {
-    const mode = MODE_CONFIG.find(m => m.id === modeId) || MODE_CONFIG[0];
-    const newQuote = {
-      id: uuid(),
-      company: company, 
-      quoteNo: generateQuoteNo(company),
-      title: mode.defaultTitle,
-      customerName: "",
-      date: formatDate(),
-      items: mode.defaultItems.map(item => ({ ...item, id: uuid() })), 
-      leakageParts: [], 
-      notes: mode.defaultNotes,
-      payment: mode.defaultPayment,
-      discountPercent: 0,
-      negotiatedPrice: 0
-    };
-    setQuotes(prev => [newQuote, ...prev]);
-    setActiveQuoteId(newQuote.id);
-  }, [company, setQuotes, setActiveQuoteId]);
+  // 這裡不再寫 const createQuote = ... 或 const deleteQuote = ...
 
-  // (2) 刪除報價單 - 雲端同步刪除版
-  const deleteQuote = React.useCallback(async (id) => {
-    // 1. 先在本地端畫面移除
-    setQuotes(prev => prev.filter(q => q.id !== id));
-    if (activeQuoteId === id) setActiveQuoteId(null);
-
-    // 2. 同步通知雲端刪除該 ID 的資料
-    if (!GAS_URL || GAS_URL.includes("您的")) return;
-    
-    try {
-      await fetch(GAS_URL, {
-        method: "POST",
-        mode: "no-cors", 
-        body: JSON.stringify({ 
-          action: "delete", 
-          id: id 
-        })
-      });
-      console.log("☁️ 雲端資料已同步刪除");
-    } catch (e) {
-      console.error("❌ 雲端刪除失敗:", e);
-    }
-  }, [activeQuoteId, setQuotes, setActiveQuoteId]);
-
-  // (3) 更新報價單
-  const updateQuote = React.useCallback((id, data) => {
-    setQuotes(prev => prev.map(q => q.id === id ? { ...q, ...data } : q));
-  }, [setQuotes]);
-
-  // (4) 複製報價單
-  const duplicateQuote = React.useCallback((id) => {
-    const sourceQuote = quotes.find(q => q.id === id);
-    if (!sourceQuote) return;
-
-    const newQuote = {
-      ...JSON.parse(JSON.stringify(sourceQuote)), 
-      id: uuid(),                                
-      quoteNo: generateQuoteNo(sourceQuote.company), 
-      title: `${sourceQuote.title} (副本)`,       
-      date: formatDate(),                        
-      items: sourceQuote.items.map(item => ({ ...item, id: uuid() })),
-      leakageParts: (sourceQuote.leakageParts || []).map(part => ({ ...part, id: uuid() }))
-    };
-
-    setQuotes(prev => [newQuote, ...prev]);
-    setActiveQuoteId(newQuote.id);
-  }, [quotes, setQuotes, setActiveQuoteId]);
-
-  // (5) 套用模式
-  const applyMode = React.useCallback((modeId) => {
-    if (!activeQuoteId) return;
-    const mode = MODE_CONFIG.find(m => m.id === modeId);
-    if (!mode) return;
-    if (!window.confirm("確定要覆蓋當前報價單內容嗎？此動作無法復原。")) return;
-    const newItems = mode.defaultItems.map(item => ({ ...item, id: uuid() }));
-    updateQuote(activeQuoteId, {
-      items: newItems,
-      leakageParts: [],
-      notes: mode.defaultNotes,
-      payment: mode.defaultPayment
-    });
-  }, [activeQuoteId, updateQuote]);
-
-  // UI 介面
   return (
     <div className="min-h-screen bg-gray-50 flex print:block print:bg-white">
         {/* 側邊欄 */}
-        <div className="w-96 bg-white p-6 shadow-lg flex-shrink-0 text-lg sticky top-0 h-screen overflow-y-auto no-print">
+        <aside className="w-96 bg-white p-6 shadow-lg flex-shrink-0 text-lg sticky top-0 h-screen overflow-y-auto no-print">
             <h1 className="text-2xl font-extrabold mb-6 text-center text-blue-700">工程報價系統</h1>
+            
             <CompanySelector />
+            
+            {/* 這裡的 applyMode 會直接使用來自 Context 的功能 */}
             <ModeSelector applyMode={applyMode} />
+            
+            {/* ☁️ 如果需要手動同步按鈕 */}
+            <button 
+              onClick={loadFromCloud} 
+              className="w-full mb-6 py-2 border-2 border-blue-500 text-blue-600 rounded-md font-bold hover:bg-blue-50 transition-colors text-sm shadow-sm"
+            >
+              🔄 從雲端同步最新資料
+            </button>
+
             <QuoteList 
                 quotes={quotes} 
                 activeId={activeQuoteId} 
@@ -2252,15 +2185,16 @@ function App() {
                 deleteQuote={deleteQuote} 
                 duplicateQuote={duplicateQuote} 
             />
-        </div>
+        </aside>
+        
         {/* 主編輯區 */}
         <div className="flex-grow p-8 text-base print:p-0">
-            <QuoteEditor updateQuote={updateQuote} />
+            {/* QuoteEditor 內部會透過 Context 拿 updateQuote，所以這裡不用傳 */}
+            <QuoteEditor /> 
         </div>
     </div>
   );
 }
-
 /***********************************************************
  * P6 — React 18 啟動
  ***********************************************************/
