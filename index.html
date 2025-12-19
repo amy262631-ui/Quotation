@@ -2147,37 +2147,79 @@ function LeakagePartsEditor({ parts, updateQuote }) {
  * P5 — App 根元件 (正確引用版：不重複定義邏輯)
  ***********************************************************/
 function App() {
-  // ⭐ 直接從 Context 拿取 AppProvider 定義好的所有功能
   const { 
-    quotes, 
-    activeQuoteId, setActiveQuoteId, 
-    deleteQuote, 
-    duplicateQuote, 
-    applyMode,
-    loadFromCloud // 如果有雲端同步按鈕需要這個
+    quotes, setQuotes, 
+    activeQuoteId, setActiveQuoteId,
+    company 
   } = React.useContext(AppContext);
 
-  // 這裡不再寫 const createQuote = ... 或 const deleteQuote = ...
+  // (1) 新建報價單
+  const createQuote = React.useCallback((modeId = null) => {
+    const mode = MODE_CONFIG.find(m => m.id === modeId) || MODE_CONFIG[0];
+    const newQuote = {
+      id: uuid(),
+      company: company, 
+      quoteNo: generateQuoteNo(company),
+      title: mode.defaultTitle,
+      customerName: "",
+      date: formatDate(),
+      items: mode.defaultItems.map(item => ({ ...item, id: uuid() })), 
+      leakageParts: [], 
+      notes: mode.defaultNotes,
+      payment: mode.defaultPayment,
+      discountPercent: 0,
+      negotiatedPrice: 0
+    };
+   setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+    syncToCloud(newQuote); // ⭐ 存入雲端
+  }, [company, syncToCloud]);
 
+  // (2) 刪除報價單
+  const deleteQuote = React.useCallback((id) => {
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    if (activeQuoteId === id) setActiveQuoteId(null);
+  }, [activeQuoteId, setQuotes, setActiveQuoteId]);
+
+  // (4) 複製報價單
+ const duplicateQuote = React.useCallback((id) => {
+    const src = quotes.find(q => q.id === id);
+    if (!src) return;
+    const newQuote = {
+      ...JSON.parse(JSON.stringify(src)),
+      id: uuid(),
+      quoteNo: generateQuoteNo(src.company),
+      title: `${src.title} (副本)`,
+      date: formatDate(),
+      items: (src.items || []).map(i => ({ ...i, id: uuid() })),
+      leakageParts: (src.leakageParts || []).map(p => ({ ...p, id: uuid() }))
+    };
+    setQuotes(prev => [newQuote, ...prev]);
+    setActiveQuoteId(newQuote.id);
+    syncToCloud(newQuote); // ⭐ 副本存入雲端
+  }, [quotes, syncToCloud]);;
+  // (5) 套用模式
+  const applyMode = React.useCallback((modeId) => {
+    if (!activeQuoteId) return;
+    const mode = MODE_CONFIG.find(m => m.id === modeId);
+    if (!mode) return;
+    if (!window.confirm("確定要覆蓋當前報價單內容嗎？此動作無法復原。")) return;
+    const newItems = mode.defaultItems.map(item => ({ ...item, id: uuid() }));
+    updateQuote(activeQuoteId, {
+      items: newItems,
+      leakageParts: [],
+      notes: mode.defaultNotes,
+      payment: mode.defaultPayment
+    });
+  }, [activeQuoteId, updateQuote]);
+  // UI 介面
   return (
     <div className="min-h-screen bg-gray-50 flex print:block print:bg-white">
         {/* 側邊欄 */}
-        <aside className="w-96 bg-white p-6 shadow-lg flex-shrink-0 text-lg sticky top-0 h-screen overflow-y-auto no-print">
+        <div className="w-96 bg-white p-6 shadow-lg flex-shrink-0 text-lg sticky top-0 h-screen overflow-y-auto no-print">
             <h1 className="text-2xl font-extrabold mb-6 text-center text-blue-700">工程報價系統</h1>
-            
             <CompanySelector />
-            
-            {/* 這裡的 applyMode 會直接使用來自 Context 的功能 */}
             <ModeSelector applyMode={applyMode} />
-            
-            {/* ☁️ 如果需要手動同步按鈕 */}
-            <button 
-              onClick={loadFromCloud} 
-              className="w-full mb-6 py-2 border-2 border-blue-500 text-blue-600 rounded-md font-bold hover:bg-blue-50 transition-colors text-sm shadow-sm"
-            >
-              🔄 從雲端同步最新資料
-            </button>
-
             <QuoteList 
                 quotes={quotes} 
                 activeId={activeQuoteId} 
@@ -2185,12 +2227,10 @@ function App() {
                 deleteQuote={deleteQuote} 
                 duplicateQuote={duplicateQuote} 
             />
-        </aside>
-        
+        </div>
         {/* 主編輯區 */}
         <div className="flex-grow p-8 text-base print:p-0">
-            {/* QuoteEditor 內部會透過 Context 拿 updateQuote，所以這裡不用傳 */}
-            <QuoteEditor /> 
+            <QuoteEditor updateQuote={updateQuote} />
         </div>
     </div>
   );
