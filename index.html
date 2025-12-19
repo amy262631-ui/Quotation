@@ -2174,10 +2174,28 @@ function App() {
     setActiveQuoteId(newQuote.id);
   }, [company, setQuotes, setActiveQuoteId]);
 
-  // (2) 刪除報價單
-  const deleteQuote = React.useCallback((id) => {
+  // (2) 刪除報價單 - 雲端同步刪除版
+  const deleteQuote = React.useCallback(async (id) => {
+    // 1. 先在本地端畫面移除
     setQuotes(prev => prev.filter(q => q.id !== id));
     if (activeQuoteId === id) setActiveQuoteId(null);
+
+    // 2. 同步通知雲端刪除該 ID 的資料
+    if (!GAS_URL || GAS_URL.includes("您的")) return;
+    
+    try {
+      await fetch(GAS_URL, {
+        method: "POST",
+        mode: "no-cors", 
+        body: JSON.stringify({ 
+          action: "delete", 
+          id: id 
+        })
+      });
+      console.log("☁️ 雲端資料已同步刪除");
+    } catch (e) {
+      console.error("❌ 雲端刪除失敗:", e);
+    }
   }, [activeQuoteId, setQuotes, setActiveQuoteId]);
 
   // (3) 更新報價單
