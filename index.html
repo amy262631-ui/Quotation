@@ -1211,10 +1211,20 @@ function QuoteEditor() {
                         </div>
                         <div className="col-span-1">
                             <label className="block text-xs font-bold text-gray-500 mb-1">客戶名稱</label>
-                            <CustomerSearchInput value={activeQuote.customerName} onChange={(val) => handleChange("customerName", val)} onSelect={(found) => updateQuote(activeQuote.id, { customerName: found["客戶名稱"], contact: found["聯絡人"] || "", phone: found["電話"] || "", location: found["地址"] || "" })} />
+                            <CustomerSearchInput value={activeQuote.customerName} onChange={(val) => handleChange("customerName", val)} onSelect={(found) => updateQuote(activeQuote.id, { customerName: found["客戶名稱"], contact: found["聯絡人"] || "", phone: found["電話"] || "",fax: found["傳真"] || "", location: found["地址"] || "" })} />
                         </div>
                         <div className="col-span-1"><label className="block text-xs font-bold text-gray-500 mb-1">聯絡人</label><input type="text" value={activeQuote.contact} onChange={(e) => handleChange("contact", e.target.value)} className="w-full border rounded px-2 py-1 text-sm outline-none" /></div>
                         <div className="col-span-1"><label className="block text-xs font-bold text-gray-500 mb-1">聯絡電話</label><input type="text" value={activeQuote.phone} onChange={(e) => handleChange("phone", e.target.value)} className="w-full border rounded px-2 py-1 text-sm outline-none" /></div>
+                        <div className="col-span-1">
+    <label className="block text-xs font-bold text-gray-500 mb-1">傳真號碼</label>
+    <input 
+        type="text" 
+        value={activeQuote.fax || ""} 
+        onChange={(e) => handleChange("fax", e.target.value)} 
+        className="w-full border rounded px-2 py-1 text-sm outline-none" 
+        placeholder="自動帶入或輸入傳真..." 
+    />
+</div>
                         <div className="col-span-1"><label className="block text-xs font-bold text-gray-500 mb-1">工程地點</label><input type="text" value={activeQuote.location} onChange={(e) => handleChange("location", e.target.value)} className="w-full border rounded px-2 py-1 text-sm outline-none" /></div>
                     </div>
 
@@ -1499,6 +1509,7 @@ function ExportWordButton() {
               <strong>報價單號：</strong>${activeQuote.quoteNo}<br/>
               <strong>報價日期：</strong>${activeQuote.date}<br/>
               <strong>聯絡人：：</strong>${activeQuote.contact || ""}
+              &nbsp;&nbsp;&nbsp;<strong>傳真：</strong>${activeQuote.fax || ""}
             </td>
           </tr>
         </table>
@@ -1781,6 +1792,7 @@ function PrintLayout({ quote, totalAmount, negotiatedAmount, isPreview }) {
                  <div><strong>報價單號：</strong>{quote.quoteNo}</div>
                  <div><strong>報價日期：</strong>{quote.date}</div>
                  <div><strong>聯絡人：</strong>{quote.contact}</div>
+                <div><strong>傳真：</strong>{quote.fax}</div>
               </td>
             </tr>
           </tbody>
